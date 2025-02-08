@@ -12,8 +12,6 @@ namespace Ellang.Compiler.Infra;
 public sealed class LogValuesFormatter
 {
 	private const string NullValue = "(null)";
-	private readonly List<string> _valueNames = new List<string>();
-
 	private readonly CompositeFormat _format;
 
 	// NOTE: If this assembly ever builds for netcoreapp, the below code should change to:
@@ -44,7 +42,7 @@ public sealed class LogValuesFormatter
 
 			if (closeBraceIndex == endIndex)
 			{
-				sb.Append(format.AsSpan(scanIndex, endIndex - scanIndex));
+				_ = sb.Append(format.AsSpan(scanIndex, endIndex - scanIndex));
 				scanIndex = endIndex;
 			}
 			else
@@ -53,10 +51,10 @@ public sealed class LogValuesFormatter
 				var formatDelimiterIndex = format.AsSpan(openBraceIndex, closeBraceIndex - openBraceIndex).IndexOfAny(',', ':');
 				formatDelimiterIndex = formatDelimiterIndex < 0 ? closeBraceIndex : formatDelimiterIndex + openBraceIndex;
 
-				sb.Append(format.AsSpan(scanIndex, openBraceIndex - scanIndex + 1));
-				sb.Append(_valueNames.Count);
-				_valueNames.Add(format.Substring(openBraceIndex + 1, formatDelimiterIndex - openBraceIndex - 1));
-				sb.Append(format.AsSpan(formatDelimiterIndex, closeBraceIndex - formatDelimiterIndex + 1));
+				_ = sb.Append(format.AsSpan(scanIndex, openBraceIndex - scanIndex + 1));
+				_ = sb.Append(ValueNames.Count);
+				ValueNames.Add(format.Substring(openBraceIndex + 1, formatDelimiterIndex - openBraceIndex - 1));
+				_ = sb.Append(format.AsSpan(formatDelimiterIndex, closeBraceIndex - formatDelimiterIndex + 1));
 
 				scanIndex = closeBraceIndex + 1;
 			}
@@ -66,7 +64,7 @@ public sealed class LogValuesFormatter
 	}
 
 	public string OriginalFormat { get; }
-	public List<string> ValueNames => _valueNames;
+	public List<string> ValueNames { get; } = [];
 
 	private static int FindBraceIndex(string format, char brace, int startIndex, int endIndex)
 	{
@@ -157,58 +155,45 @@ public sealed class LogValuesFormatter
 
 	public string Format() => _format.Format;
 
-	public string Format<TArg0>(TArg0 arg0)
-	{
-		return
-			!TryFormatArgumentIfNullOrEnumerable(arg0, out var arg0String) ?
-			string.Format(CultureInfo.InvariantCulture, _format, arg0) :
-			string.Format(CultureInfo.InvariantCulture, _format, arg0String);
-	}
+	public string Format<TArg0>(TArg0 arg0) => 
+		!TryFormatArgumentIfNullOrEnumerable(arg0, out var arg0String) 
+			? string.Format(CultureInfo.InvariantCulture, _format, arg0) 
+			: string.Format(CultureInfo.InvariantCulture, _format, arg0String);
 
-	public string Format<TArg0, TArg1>(TArg0 arg0, TArg1 arg1)
-	{
-		return
-			TryFormatArgumentIfNullOrEnumerable(arg0, out var arg0String) | TryFormatArgumentIfNullOrEnumerable(arg1, out var arg1String) ?
-			string.Format(CultureInfo.InvariantCulture, _format, arg0String ?? arg0, arg1String ?? arg1) :
-			string.Format(CultureInfo.InvariantCulture, _format, arg0, arg1);
-	}
+	public string Format<TArg0, TArg1>(TArg0 arg0, TArg1 arg1) => 
+		TryFormatArgumentIfNullOrEnumerable(arg0, out var arg0String) | TryFormatArgumentIfNullOrEnumerable(arg1, out var arg1String)
+			? string.Format(CultureInfo.InvariantCulture, _format, arg0String ?? arg0, arg1String ?? arg1)
+			: string.Format(CultureInfo.InvariantCulture, _format, arg0, arg1);
 
-	public string Format<TArg0, TArg1, TArg2>(TArg0 arg0, TArg1 arg1, TArg2 arg2)
-	{
-		return
-			TryFormatArgumentIfNullOrEnumerable(arg0, out var arg0String) | TryFormatArgumentIfNullOrEnumerable(arg1, out var arg1String) | TryFormatArgumentIfNullOrEnumerable(arg2, out var arg2String) ?
-			string.Format(CultureInfo.InvariantCulture, _format, arg0String ?? arg0, arg1String ?? arg1, arg2String ?? arg2) :
-			string.Format(CultureInfo.InvariantCulture, _format, arg0, arg1, arg2);
-	}
+	public string Format<TArg0, TArg1, TArg2>(TArg0 arg0, TArg1 arg1, TArg2 arg2) => 
+		TryFormatArgumentIfNullOrEnumerable(arg0, out var arg0String) | TryFormatArgumentIfNullOrEnumerable(arg1, out var arg1String) | TryFormatArgumentIfNullOrEnumerable(arg2, out var arg2String) 
+		? string.Format(CultureInfo.InvariantCulture, _format, arg0String ?? arg0, arg1String ?? arg1, arg2String ?? arg2) 
+		: string.Format(CultureInfo.InvariantCulture, _format, arg0, arg1, arg2);
 
 	public KeyValuePair<string, object?> GetValue(object?[] values, int index)
 	{
-		if (index < 0 || index > _valueNames.Count)
+		if (index < 0 || index > ValueNames.Count)
 #pragma warning disable CA2201 // Do not raise reserved exception types
 			throw new IndexOutOfRangeException(nameof(index));
 
-		if (_valueNames.Count > index)
-			return new KeyValuePair<string, object?>(_valueNames[index], values[index]);
-
-		return new KeyValuePair<string, object?>("{OriginalFormat}", OriginalFormat);
+		return ValueNames.Count > index
+			? new KeyValuePair<string, object?>(ValueNames[index], values[index])
+			: new KeyValuePair<string, object?>("{OriginalFormat}", OriginalFormat);
 	}
 
 	public IEnumerable<KeyValuePair<string, object?>> GetValues(object[] values)
 	{
 		var valueArray = new KeyValuePair<string, object?>[values.Length + 1];
-		for (var index = 0; index != _valueNames.Count; ++index)
+		for (var index = 0; index != ValueNames.Count; ++index)
 		{
-			valueArray[index] = new KeyValuePair<string, object?>(_valueNames[index], values[index]);
+			valueArray[index] = new KeyValuePair<string, object?>(ValueNames[index], values[index]);
 		}
 
-		valueArray[valueArray.Length - 1] = new KeyValuePair<string, object?>("{OriginalFormat}", OriginalFormat);
+		valueArray[^1] = new KeyValuePair<string, object?>("{OriginalFormat}", OriginalFormat);
 		return valueArray;
 	}
 
-	private static object FormatArgument(object? value)
-	{
-		return TryFormatArgumentIfNullOrEnumerable(value, out var stringValue) ? stringValue : value!;
-	}
+	private static object FormatArgument(object? value) => TryFormatArgumentIfNullOrEnumerable(value, out var stringValue) ? stringValue : value!;
 
 	private static bool TryFormatArgumentIfNullOrEnumerable<T>(T? value, [NotNullWhen(true)] out object? stringValue)
 	{
@@ -219,16 +204,16 @@ public sealed class LogValuesFormatter
 		}
 
 		// if the value implements IEnumerable but isn't itself a string, build a comma separated string.
-		if (value is not string && value is IEnumerable enumerable)
+		if (value is not string and IEnumerable enumerable)
 		{
 			var sb = new StringBuilder();
 			var first = true;
 			foreach (var e in enumerable)
 			{
 				if (!first)
-					sb.Append(", ");
+					_ = sb.Append(", ");
 
-				sb.Append(e != null ? e.ToString() : NullValue);
+				_ = sb.Append(e != null ? e.ToString() : NullValue);
 				first = false;
 			}
 			stringValue = sb.ToString();

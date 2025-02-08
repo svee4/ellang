@@ -86,10 +86,7 @@ public sealed class Lexer(ILogger<Lexer> logger)
 			ThrowLexerException(s);
 	}
 
-	private void ThrowLexerException(string message)
-	{
-		throw new LexerException(_line, _column, message);
-	}
+	private void ThrowLexerException(string message) => throw new LexerException(_line, _column, message);
 
 	private static readonly FrozenDictionary<string, Keyword> Keywords = new Dictionary<string, Keyword>()
 	{
@@ -114,7 +111,7 @@ public sealed class Lexer(ILogger<Lexer> logger)
 
 			if (Peek() == '\n')
 			{
-				Eat();
+				_ = Eat();
 				_line++;
 				_column = 0;
 				continue;
@@ -122,7 +119,7 @@ public sealed class Lexer(ILogger<Lexer> logger)
 
 			if (char.IsWhiteSpace(Peek()))
 			{
-				Eat();
+				_ = Eat();
 				_column++;
 				continue;
 			}
@@ -131,10 +128,10 @@ public sealed class Lexer(ILogger<Lexer> logger)
 			{
 				do
 				{
-					Eat();
+					_ = Eat();
 				} while (Peek() != '\n');
 
-				Eat();
+				_ = Eat();
 				_line++;
 				_column = 0;
 				continue;
@@ -166,7 +163,7 @@ public sealed class Lexer(ILogger<Lexer> logger)
 
 			if (token is not null)
 			{
-				Eat();
+				_ = Eat();
 				tokens.Add(token);
 				continue;
 			}
@@ -194,7 +191,7 @@ public sealed class Lexer(ILogger<Lexer> logger)
 
 			if (token is not null)
 			{
-				Eat(2);
+				_ = Eat(2);
 				tokens.Add(token);
 				continue;
 			}
@@ -202,7 +199,9 @@ public sealed class Lexer(ILogger<Lexer> logger)
 			var str = ReadIdentifierOrKeyword();
 
 			if (Keywords.TryGetValue(str, out var keyword))
+			{
 				tokens.Add(keyword);
+			}
 			else
 			{
 				tokens.Add(new IdentifierLiteral(str));

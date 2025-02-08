@@ -149,25 +149,25 @@ public sealed class SyntaxTree
 
 		public IndentedTextWriter Append(char value)
 		{
-			StringBuilder.Append(value);
+			_ = StringBuilder.Append(value);
 			return this;
 		}
 
 		public IndentedTextWriter Append(string value)
 		{
-			StringBuilder.Append(value);
+			_ = StringBuilder.Append(value);
 			return this;
 		}
 
 		public IndentedTextWriter AppendLine()
 		{
-			StringBuilder.AppendLine();
+			_ = StringBuilder.AppendLine();
 			return this;
 		}
 
 		public IndentedTextWriter AppendLine(string value)
 		{
-			StringBuilder.AppendLine(value);
+			_ = StringBuilder.AppendLine(value);
 			return this;
 		}
 
@@ -185,7 +185,7 @@ public sealed class SyntaxTree
 
 		public IDisposable WithIndent()
 		{
-			AddIndent();
+			_ = AddIndent();
 			return new Unindenter(this);
 		}
 
