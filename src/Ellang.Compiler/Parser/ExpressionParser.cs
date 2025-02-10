@@ -1,8 +1,8 @@
 using Ellang.Compiler.Lexer;
 using Ellang.Compiler.Parser.Nodes;
 using Ellang.Compiler.Parser.Parselets;
-using System.Collections.Frozen;
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 
 namespace Ellang.Compiler.Parser;
 
@@ -10,26 +10,31 @@ public sealed class ExpressionParser(Parser parser)
 {
 	private readonly Parser _parser = parser;
 
+	private IDisposable? Scope(Precedence? precedence, [CallerMemberName] string caller = "")
+	{
+		return _parser.Scope($"{nameof(ExpressionParser)}.{caller}{(precedence is null ? null : $"@{precedence}")}" );
+	}
+
 	public IExpression ParseExpression(Precedence precedence)
 	{
-		using var scope = _parser.Scope();
+		using var scope = Scope(precedence);
 
 		var token = _parser.Peek();
 		if (token is SemiColon)
 		{
-			_parser.Throw("Expected expression, got semicolon");
+			_parser.ThrowAt(token, "Expected expression, got semicolon");
 			throw new UnreachableException();
 		}
 
-		if (!PrefixParselets.TryGetValue(token.GetType(), out var prefixParselet))
+		if (GetPrefixParseletForToken(token) is not { } prefixParselet)
 		{
-			_parser.Throw("No prefix parselet for token {Token}", token);
+			_parser.ThrowAt(token, "No prefix parselet for token {Token}", token);
 			throw new UnreachableException();
 		}
 
 		var expr = prefixParselet.Parse(_parser);
 
-		while (InfixParselets.TryGetValue(_parser.Peek().GetType(), out var infixParselet) && precedence < infixParselet.Precedence)
+		while (GetInfixParseletForToken(_parser.Peek()) is { } infixParselet && precedence < infixParselet.GetPrecedence())
 		{
 			expr = infixParselet.Parse(_parser, expr);
 		}
@@ -37,24 +42,59 @@ public sealed class ExpressionParser(Parser parser)
 		return expr;
 	}
 
-	private static readonly FrozenDictionary<Type, IPrefixParselet> PrefixParselets = new Dictionary<Type, IPrefixParselet>
-	{
-		{ typeof(OpenParen), new GroupingParselet() },
-		{ typeof(Bang), new PrefixOperatorParselet<Bang>() },
-		{ typeof(Minus), new PrefixOperatorParselet<Minus>() },
-		{ typeof(Star), new PrefixOperatorParselet<Star>() },
-		{ typeof(IdentifierLiteral), new IdentifierParselet() },
-		{ typeof(StringLiteral), new LiteralParselet<StringLiteral>() },
-		{ typeof(NumericLiteral), new LiteralParselet<NumericLiteral>() },
-	}.ToFrozenDictionary();
+#pragma warning disable format
 
-	private static readonly FrozenDictionary<Type, IInfixParselet> InfixParselets = new Dictionary<Type, IInfixParselet>
+	[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static",
+		Justification = "One day might not be")]
+	private IPrefixParselet? GetPrefixParseletForToken(LexerToken token) => token switch
 	{
-		{ typeof(Equal), new AssignmentParselet() },
-		{ typeof(OpenParen), new FunctionCallParselet() },
-		{ typeof(Plus), new BinaryOperatorParselet<Plus>(Precedence.AdditionOrSubtraction) },
-		{ typeof(Minus), new BinaryOperatorParselet<Minus>(Precedence.AdditionOrSubtraction) },
-		{ typeof(Star), new BinaryOperatorParselet<Star>(Precedence.MultiplicationOrDivision) },
-		{ typeof(Slash), new BinaryOperatorParselet<Slash>(Precedence.MultiplicationOrDivision) },
-	}.ToFrozenDictionary();
+		Bang =>			new PrefixOperatorParselet<Bang>(),
+		Minus =>		new PrefixOperatorParselet<Minus>(),
+		Star =>			new PrefixOperatorParselet<Star>(),
+		OpenParen =>	new GroupingParselet(),
+		StringLiteral =>	new LiteralParselet<StringLiteral>(),
+		NumericLiteral =>	new LiteralParselet<NumericLiteral>(),
+		IdentifierLiteral =>	new IdentifierParselet(),
+		_ => null
+	};
+
+	private IInfixParselet? GetInfixParseletForToken(LexerToken token) => token switch
+	{
+		Equal =>	new AssignmentParselet(),
+		Plus =>		new BinaryOperatorParselet<Plus>(_parser),
+		Minus =>	new BinaryOperatorParselet<Minus>(_parser),
+		Star =>		new BinaryOperatorParselet<Star>(_parser),
+		Slash =>	new BinaryOperatorParselet<Slash>(_parser),
+		Ampersand =>	new BinaryOperatorParselet<Ampersand>(_parser),
+		OpenParen =>	new FunctionCallParselet(),
+		OpenBracket =>	new IndexerCallParselet(),
+		DoubleEqual =>	new BinaryOperatorParselet<DoubleEqual>(_parser),
+		NotEqual =>		new BinaryOperatorParselet<NotEqual>(_parser),
+		OpenAngleBracket =>		new BinaryOperatorParselet<OpenAngleBracket>(_parser),
+		CloseAngleBracket =>	new BinaryOperatorParselet<CloseAngleBracket>(_parser),
+		_ => null
+	};
+
+#pragma warning restore format
+
+	//private static readonly FrozenDictionary<Type, IPrefixParselet> PrefixParselets = new Dictionary<Type, IPrefixParselet>
+	//{
+	//	{ typeof(OpenParen), new GroupingParselet() },
+	//	{ typeof(Bang), new PrefixOperatorParselet<Bang>() },
+	//	{ typeof(Minus), new PrefixOperatorParselet<Minus>() },
+	//	{ typeof(Star), new PrefixOperatorParselet<Star>() },
+	//	{ typeof(IdentifierLiteral), new IdentifierParselet() },
+	//	{ typeof(StringLiteral), new LiteralParselet<StringLiteral>() },
+	//	{ typeof(NumericLiteral), new LiteralParselet<NumericLiteral>() },
+	//}.ToFrozenDictionary();
+
+	//private static readonly FrozenDictionary<Type, IInfixParselet> InfixParselets = new Dictionary<Type, IInfixParselet>
+	//{
+	//	{ typeof(Equal), new AssignmentParselet() },
+	//	{ typeof(OpenParen), new FunctionCallParselet() },
+	//	{ typeof(Plus), new BinaryOperatorParselet<Plus>(Precedence.AdditionOrSubtraction) },
+	//	{ typeof(Minus), new BinaryOperatorParselet<Minus>(Precedence.AdditionOrSubtraction) },
+	//	{ typeof(Star), new BinaryOperatorParselet<Star>(Precedence.MultiplicationOrDivision) },
+	//	{ typeof(Slash), new BinaryOperatorParselet<Slash>(Precedence.MultiplicationOrDivision) },
+	//}.ToFrozenDictionary();
 }

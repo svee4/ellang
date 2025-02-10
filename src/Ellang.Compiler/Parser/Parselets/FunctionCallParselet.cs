@@ -8,7 +8,7 @@ namespace Ellang.Compiler.Parser.Parselets;
 // as well as GetHof()(); where GetHof is func GetHof(): TODO: how to express function types?
 public sealed class FunctionCallParselet : ParseletBase, IInfixParselet
 {
-	public Precedence Precedence => Precedence.FunctionCall;
+	public Precedence GetPrecedence() => Precedence.Primary;
 
 	public IExpression Parse(Parser parser, IExpression left)
 	{

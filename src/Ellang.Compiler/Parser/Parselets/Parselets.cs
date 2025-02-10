@@ -11,18 +11,27 @@ public interface IPrefixParselet
 public interface IInfixParselet
 {
 	IExpression Parse(Parser parser, IExpression left);
-	Precedence Precedence { get; }
+	Precedence GetPrecedence();
 }
 
+// precedence rules are heavily inspired by C# rules
+// https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/operators/#operator-precedence
 public enum Precedence
 {
 	None = 0,
 	Assignment = 1,
-	AdditionOrSubtraction,
-	MultiplicationOrDivision,
-	Prefix,
-	Postfix,
-	FunctionCall
+	LogicalOr, // ||
+	LogicalAnd, // &&
+	BitwiseOr, // |
+	BitwiseXor, // ^
+	BitwiseAnd, // &
+	LogicalEquality, // ==, !=
+	LogicalComparison, // <, >
+	Additive, // +, -
+	Multiplicative, // *, /
+	Prefix, // -, !, ~
+	Postfix, // none yet
+	Primary // function call, indexer call, member access
 }
 
 public abstract class ParseletBase

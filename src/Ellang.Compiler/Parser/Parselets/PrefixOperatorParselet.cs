@@ -8,9 +8,6 @@ namespace Ellang.Compiler.Parser.Parselets;
 // as listed in the switch
 public sealed class PrefixOperatorParselet<TToken> : ParseletBase, IPrefixParselet where TToken : LexerToken
 {
-	public PrefixOperatorParselet() =>
-		Debug.Assert(PrefixOperatorParselet.SupportedTokens.Contains(typeof(TToken)));
-
 	public IExpression Parse(Parser parser)
 	{
 		using var scope = Scope(parser);
@@ -23,12 +20,7 @@ public sealed class PrefixOperatorParselet<TToken> : ParseletBase, IPrefixParsel
 			Bang => new LogicalNegationExpression(expr),
 			Minus => new MathematicalNegationExpression(expr),
 			Star => new DereferenceExpression(expr),
-			_ => parser.Throw<IExpression>("Unimplemented or unsupported unary prefix operator {Token}", token)
+			_ => parser.ThrowAt<IExpression>(token, "Unimplemented or unsupported unary prefix operator {Token}", token)
 		};
 	}
-}
-
-public static class PrefixOperatorParselet
-{
-	public static IReadOnlyList<Type> SupportedTokens => [typeof(Bang), typeof(Minus), typeof(Star)];
 }

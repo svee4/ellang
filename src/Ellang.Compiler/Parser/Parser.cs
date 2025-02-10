@@ -52,8 +52,11 @@ public sealed class Parser
 	public LexerToken Peek(int skip) => _tokens[_position + skip];
 	public LexerToken Eat() => _tokens[_position++];
 
+	public T Peek<T>() where T : LexerToken =>
+		Peek() is T v ? v : ThrowAt<T>(Peek(), "Expected {Expected}, got {Actual}", typeof(T), Peek().GetType());
+
 	public T Eat<T>() where T : LexerToken =>
-		Peek() is T ? (T)Eat() : Throw<T>("Expected {Expected}, got {Actual}", typeof(T), Eat().GetType());
+		Peek() is T ? (T)Eat() : ThrowAt<T>(Peek(), "Expected {Expected}, got {Actual}", typeof(T), Eat().GetType());
 
 	public T? EatIf<T>() where T : LexerToken =>
 		Peek() is T ? Eat<T>() : null;
@@ -68,7 +71,7 @@ public sealed class Parser
 		{
 			FuncKeyword => ParseFunction(),
 			StructKeyword => ParseStruct(),
-			var token => Throw<ITopLevelStatement>("Expected func or struct, got {Actual}", token.GetType())
+			var token => ThrowAt<ITopLevelStatement>(token, "Expected func or struct, got {Actual}", token.GetType())
 		};
 	}
 
@@ -145,13 +148,20 @@ public sealed class Parser
 			case VarKeyword:
 			{
 				var expr = ParseVariableDeclaration();
-				_ = Eat<SemiColon>(); // i dont remember what eats this
+				_ = Eat<SemiColon>();
 				return expr;
+			}
+			case UnderscoreKeyword:
+			{
+				_ = Eat<UnderscoreKeyword>();
+				_ = Eat<Equal>();
+				var expr = ParseExpression();
+				_ = Eat<SemiColon>();
+				return new DiscardStatement(expr);
 			}
 			default:
 			{
-				//return ParseExpressionStatement();
-				Throw("Expected expression, got {Token}", Peek());
+				ThrowAt(Peek(), "Expected statement");
 				throw new UnreachableException();
 			}
 		}
@@ -218,20 +228,35 @@ public sealed class Parser
 			refCount++;
 		}
 
-		var type = Eat<IdentifierLiteral>().Value;
+		var identifier = Eat<IdentifierLiteral>().Value;
 
-		return refCount > 0
-			? new RefTypeRef(new Identifier(type), refCount)
-			: new PlainTypeRef(new Identifier(type));
+		List<TypeRef> generics = [];
+		if (EatIf<OpenAngleBracket>() is not null)
+		{
+			generics.Add(ParseTypeRef());
+			_ = Eat<CloseAngleBracket>();
+		}
+
+		return new TypeRef(new Identifier(identifier), refCount, generics);
 	}
 
-	[SuppressMessage("Usage", "CA2254:Template should be a static expression", Justification = "It is at call site")]
+	[SuppressMessage("Usage", "CA2254:Template should be a static expression", Justification = "Close enough")]
 	[DoesNotReturn]
-	internal T Throw<T>(string format, params object[] args)
+	internal T Throw<T>(int line, int column, string format, params object?[] args)
 	{
+		format = $"(at {{Line}}:{{Column}}): {format}";
+		args = [line, column, .. args];
+
 		Logger.LogError(format, args);
 		throw new ParserException(new LogValuesFormatter(format).Format(args));
 	}
 
-	internal void Throw(string format, params object[] args) => Throw<object>(format, args);
+	internal void Throw(int line, int column, string format, params object?[] args) => Throw<object>(line, column, format, args);
+
+	internal T ThrowAt<T>(LexerToken token, string format, params object?[] args) =>
+		Throw<T>(token.Line, token.Column, format, args);
+
+	internal void ThrowAt(LexerToken token, string format, params object?[] args) => 
+		Throw<object>(token.Line, token.Column, format, args);
+
 }

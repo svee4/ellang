@@ -60,6 +60,18 @@ public sealed class SyntaxTree
 								w.AppendLine();
 								break;
 							}
+							case DiscardStatement discard:
+							{
+								w.Append("_ = ");
+								w.Append(ExpressionToString(discard.Expression));
+								w.Append(';');
+								break;
+							}
+							case EmptyStatement:
+							{
+								w.Append(";");
+								break;
+							}
 							default: throw new NotSupportedException();
 						}
 					}
@@ -74,7 +86,7 @@ public sealed class SyntaxTree
 				{
 					w.Append("struct ");
 					w.Append(s.Name.Value);
-					w.Append('{');
+					w.Append(" {");
 					w.AppendLine();
 					w.AddIndent();
 
@@ -98,12 +110,17 @@ public sealed class SyntaxTree
 
 		return w.StringBuilder.ToString();
 
-		static string TypeRefToString(TypeRef typeRef) => typeRef switch
+		static string TypeRefToString(TypeRef type)
 		{
-			PlainTypeRef p => p.Identifier.Value,
-			RefTypeRef r => new string('&', r.ReferenceCount) + r.Identifier.Value,
-			_ => throw new NotSupportedException()
-		};
+			var b = $"{new string('&', type.ReferenceCount)}{type.Identifier.Value}";
+
+			if (type.Generics.Count > 0)
+			{
+				b += $"<{string.Join(", ", type.Generics.Select(TypeRefToString))}>";
+			}
+
+			return b;
+		}
 
 		static string ExpressionToString(IExpression expr) => expr switch
 		{
@@ -111,20 +128,10 @@ public sealed class SyntaxTree
 			IntLiteralExpression i => i.Value.ToString(CultureInfo.InvariantCulture),
 			IdentifierExpression ident => ident.Identifier.Value,
 			AssignmentExpression ass => $"{ExpressionToString(ass.Target)} = {ExpressionToString(ass.Value)}",
+			FunctionCallExpression f => $"{ExpressionToString(f.FunctionExpression)}({string.Join(", ", f.Arguments.Select(arg => ExpressionToString(arg.Value)))})",
+			IndexerCallExpression f => $"{ExpressionToString(f.Source)}({ExpressionToString(f.Indexer)})",
 
-			BinaryExpression => expr switch
-			{
-				AdditionExpression op => $"{ExpressionToString(op.Left)} + {ExpressionToString(op.Right)}",
-				SubtractionExpression op => $"{ExpressionToString(op.Left)} - {ExpressionToString(op.Right)}",
-				MultiplicationExpression op => $"{ExpressionToString(op.Left)} * {ExpressionToString(op.Right)}",
-				DivisionExpression op => $"{ExpressionToString(op.Left)} / {ExpressionToString(op.Right)}",
-				BitwiseAndExpression op => $"{ExpressionToString(op.Left)} & {ExpressionToString(op.Right)}",
-				BitwiseOrExpression op => $"{ExpressionToString(op.Left)} | {ExpressionToString(op.Right)}",
-				BitwiseXorExpression op => $"{ExpressionToString(op.Left)} ^ {ExpressionToString(op.Right)}",
-				BitwiseLeftShiftExpression op => $"{ExpressionToString(op.Left)} << {ExpressionToString(op.Right)}",
-				BitwiseRightShiftExpression op => $"{ExpressionToString(op.Left)} >> {ExpressionToString(op.Right)}",
-				_ => throw new NotSupportedException($"Unsupported binary expression {expr}")
-			},
+			BinaryExpression bin => $"{ExpressionToString(bin.Left)} {GetBinaryExpressionOperator(bin)} {ExpressionToString(bin.Right)}",
 
 			PrefixUnaryExpression => expr switch
 			{
@@ -136,6 +143,31 @@ public sealed class SyntaxTree
 			},
 
 			_ => throw new NotSupportedException($"Unsupported expression {expr}")
+		};
+
+		static string GetBinaryExpressionOperator(BinaryExpression expr) => expr switch
+		{
+			AdditionExpression => "+",
+			SubtractionExpression => "-",
+			MultiplicationExpression => "*",
+			DivisionExpression => "/",
+
+			BitwiseAndExpression => "&",
+			BitwiseOrExpression => "|",
+			BitwiseXorExpression => "^",
+
+			BitwiseLeftShiftExpression => "<<",
+			BitwiseRightShiftExpression => ">>",
+
+			LogicalAndExpression => "&&",
+			LogicalOrExpression => "||",
+			LogicalLessThanExpression => "<",
+			LogicalGreaterThanExpression => ">",
+
+			LogicalEqualExpression => "==",
+			LogicalNotEqualExpression => "!=",
+
+			_ => throw new NotSupportedException($"Unsupported binary expression {expr}")
 		};
 	}
 

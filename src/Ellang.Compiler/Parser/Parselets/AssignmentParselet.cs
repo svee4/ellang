@@ -7,7 +7,7 @@ namespace Ellang.Compiler.Parser.Parselets;
 // for example: *(ptr) = 5;
 public sealed class AssignmentParselet : ParseletBase, IInfixParselet
 {
-	public Precedence Precedence => Precedence.Assignment;
+	public Precedence GetPrecedence() => Precedence.Assignment;
 
 	public IExpression Parse(Parser parser, IExpression left)
 	{

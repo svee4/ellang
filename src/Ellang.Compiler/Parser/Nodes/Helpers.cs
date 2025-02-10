@@ -4,9 +4,7 @@ public interface ITopLevelStatement;
 
 public sealed record Identifier(string Value);
 
-public abstract record TypeRef;
-public sealed record PlainTypeRef(Identifier Identifier) : TypeRef;
-public sealed record RefTypeRef(Identifier Identifier, int ReferenceCount) : TypeRef;
+public sealed record TypeRef(Identifier Identifier, int ReferenceCount, List<TypeRef> Generics);
 
 public sealed record NodeList<T>(List<T> Nodes)
 {

@@ -11,12 +11,20 @@ func main(argc: int, argv: &&char): int {
 	
 }
 
-func take_ref(value: &int): void {
+func sample(value: &int, list: List<int>): void {
 	var another_ref: &int = value;
 	var deref: int = *value;
-	var x: int = deref + 3;
+	var x: int = deref 3;
 
-	# random_method(x, 3);
+	var y: int = list[3];
+
+	var eq1: bool = x == deref;
+	var eq2: bool = x < deref;
+	var eq3: bool = eq1 && eq2;
+
+	var bitwised: int = x & deref;
+
+	_ = random_method(x, 3);
 }
 
 struct Test {

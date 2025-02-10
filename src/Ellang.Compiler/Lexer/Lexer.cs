@@ -33,13 +33,13 @@ public sealed class Lexer(ILogger<Lexer> logger)
 		return c;
 	}
 
-	private string Peek(int count)
+	private ReadOnlySpan<char> Peek(int count)
 	{
 		AssertValidPeek(count);
-		return _source[_index..(_index + count)];
+		return _source.AsSpan()[_index..(_index + count)];
 	}
 
-	private string Eat(int count)
+	private ReadOnlySpan<char> Eat(int count)
 	{
 		var s = Peek(count);
 		_index += count;
@@ -88,14 +88,15 @@ public sealed class Lexer(ILogger<Lexer> logger)
 
 	private void ThrowLexerException(string message) => throw new LexerException(_line, _column, message);
 
-	private static readonly FrozenDictionary<string, Keyword> Keywords = new Dictionary<string, Keyword>()
+	private Keyword? GetKeyword(string keyword) => keyword switch
 	{
-		{ "return", new ReturnKeyword() },
-		{ "struct", new StructKeyword() },
-		{ "impl", new ImplKeyword() },
-		{ "func", new FuncKeyword() },
-		{ "var", new VarKeyword() }
-	}.ToFrozenDictionary();
+		"return" => Token<ReturnKeyword>(),
+		"struct" => Token<StructKeyword>(),
+		"impl" => Token<ImplKeyword>(),
+		"func" => Token<FuncKeyword>(),
+		"var" => Token<VarKeyword>(),
+		_ => null
+	};
 
 	public List<LexerToken> Parse(string source)
 	{
@@ -139,25 +140,27 @@ public sealed class Lexer(ILogger<Lexer> logger)
 
 			LexerToken? token = Peek() switch
 			{
-				'(' => new OpenParen(),
-				')' => new CloseParen(),
-				'[' => new OpenBracket(),
-				']' => new CloseBracket(),
-				'{' => new OpenBrace(),
-				'}' => new CloseBrace(),
-				'<' => new LessThan(),
-				'>' => new GreaterThan(),
-				',' => new Comma(),
-				'+' => new Plus(),
-				'-' => new Minus(),
-				'*' => new Star(),
-				'/' => new Slash(),
-				'%' => new Percent(),
-				';' => new SemiColon(),
-				'&' => new Ampersand(),
-				':' when Peek(2) is not "::" => new Colon(),
-				'=' when Peek(2) is not "==" => new Equal(),
-				'!' when Peek(2) is not "!=" => new Bang(),
+				'(' => Token<OpenParen>(),
+				')' => Token<CloseParen>(),
+				'[' => Token<OpenBracket>(),
+				']' => Token<CloseBracket>(),
+				'{' => Token<OpenBrace>(),
+				'}' => Token<CloseBrace>(),
+				'<' => Token<OpenAngleBracket>(),
+				'>' => Token<CloseAngleBracket>(),
+				',' => Token<Comma>(),
+				'+' => Token<Plus>(),
+				'-' => Token<Minus>(),
+				'*' => Token<Star>(),
+				'/' => Token<Slash>(),
+				'%' => Token<Percent>(),
+				';' => Token<SemiColon>(),
+				'_' => Token<UnderscoreKeyword>(),
+				'&' => Token<Ampersand>(),
+				'|' => Token<Pipe>(),
+				':' when Peek(2) is not "::" => Token<Colon>(),
+				'=' when Peek(2) is not "==" => Token<Equal>(),
+				'!' when Peek(2) is not "!=" => Token<Bang>(),
 				_ => null
 			};
 
@@ -183,9 +186,9 @@ public sealed class Lexer(ILogger<Lexer> logger)
 
 			token = Peek(2) switch
 			{
-				"::" => new DoubleColon(),
-				"==" => new DoubleEqual(),
-				"!=" => new NotEqual(),
+				"::" => Token<DoubleColon>(),
+				"==" => Token<DoubleEqual>(),
+				"!=" => Token<NotEqual>(),
 				_ => null
 			};
 
@@ -198,17 +201,17 @@ public sealed class Lexer(ILogger<Lexer> logger)
 
 			var str = ReadIdentifierOrKeyword();
 
-			if (Keywords.TryGetValue(str, out var keyword))
+			if (GetKeyword(str) is { } keyword)
 			{
 				tokens.Add(keyword);
 			}
 			else
 			{
-				tokens.Add(new IdentifierLiteral(str));
+				tokens.Add(new IdentifierLiteral(str) { Line = _line, Column = _column });
 			}
 		}
 
-		tokens.Add(new EndOfFile());
+		tokens.Add(Token<EndOfFile>());
 
 		return tokens;
 	}
@@ -224,8 +227,8 @@ public sealed class Lexer(ILogger<Lexer> logger)
 		if (untilEndQuote == -1)
 			ThrowLexerException("Unterminated string literal");
 
-		var literal = Eat(untilEndQuote);
-		return new StringLiteral(literal);
+		var literal = Eat(untilEndQuote).ToString();
+		return new StringLiteral(literal) { Line = _line, Column = _column };
 	}
 
 	[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1870:Use a cached 'SearchValues' instance",
@@ -244,7 +247,7 @@ public sealed class Lexer(ILogger<Lexer> logger)
 		var literal = Eat(readUntil);
 		var intValue = int.Parse(literal, CultureInfo.InvariantCulture);
 
-		return new NumericLiteral(intValue);
+		return new NumericLiteral(intValue) { Line = _line, Column = _column };
 	}
 
 	private string ReadIdentifierOrKeyword()
@@ -257,11 +260,24 @@ public sealed class Lexer(ILogger<Lexer> logger)
 		Assert(span.Length > 0);
 
 		var length = span.IndexOfAnyExcept(Constants.ValidIdentifierChars);
-		return Eat(length);
+		return Eat(length).ToString();
+	}
+
+	private T Token<T>() where T : LexerToken
+	{
+		var instance = Activator.CreateInstance<T>();
+		typeof(T).GetProperty(nameof(LexerToken.Line))!.SetValue(instance, _line);
+		typeof(T).GetProperty(nameof(LexerToken.Column))!.SetValue(instance, _column);
+		return instance;
 	}
 }
 
-public abstract record LexerToken;
+public abstract record LexerToken
+{
+	public required int Line { get; init; }
+	public required int Column { get; init; }
+}
+
 public sealed record EndOfFile : LexerToken;
 
 public abstract record Literal : LexerToken;
@@ -275,6 +291,7 @@ public sealed record StructKeyword : Keyword;
 public sealed record ImplKeyword : Keyword;
 public sealed record FuncKeyword : Keyword;
 public sealed record VarKeyword : Keyword;
+public sealed record UnderscoreKeyword : Keyword;
 
 public sealed record OpenParen : LexerToken;
 public sealed record CloseParen : LexerToken;
@@ -282,8 +299,9 @@ public sealed record OpenBracket : LexerToken;
 public sealed record CloseBracket : LexerToken;
 public sealed record OpenBrace : LexerToken;
 public sealed record CloseBrace : LexerToken;
-public sealed record LessThan : LexerToken;
-public sealed record GreaterThan : LexerToken;
+public sealed record OpenAngleBracket : LexerToken;
+public sealed record CloseAngleBracket : LexerToken;
+
 public sealed record Comma : LexerToken;
 
 public sealed record Plus : LexerToken;
@@ -295,6 +313,7 @@ public sealed record SemiColon : LexerToken;
 public sealed record Colon : LexerToken;
 public sealed record DoubleColon : LexerToken;
 public sealed record Ampersand : LexerToken;
+public sealed record Pipe : LexerToken;
 
 public sealed record Bang : LexerToken;
 public sealed record Equal : LexerToken;
