@@ -21,7 +21,7 @@ public sealed class SyntaxTree
 
 			switch (statement)
 			{
-				case FunctionExpressionStatement func:
+				case FunctionDeclarationStatement func:
 				{
 					w.Append("func ");
 					w.Append(func.Name.Value);
@@ -112,7 +112,7 @@ public sealed class SyntaxTree
 
 		static string TypeRefToString(TypeRef type)
 		{
-			var b = $"{new string('&', type.ReferenceCount)}{type.Identifier.Value}";
+			var b = $"{new string('&', type.PointerCount)}{type.Identifier.Value}";
 
 			if (type.Generics.Count > 0)
 			{

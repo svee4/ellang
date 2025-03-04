@@ -95,6 +95,16 @@ public sealed class Lexer(ILogger<Lexer> logger)
 		"impl" => Token<ImplKeyword>(),
 		"func" => Token<FuncKeyword>(),
 		"var" => Token<VarKeyword>(),
+
+		"byte" => Token<ByteKeyword>(),
+		"sbyte" => Token<SByteKeyword>(),
+		"short" => Token<ShortKeyword>(),
+		"ushort" => Token<UShortKeyword>(),
+		"int" => Token<IntKeyword>(),
+		"uint" => Token<UIntKeyword>(),
+		"long" => Token<LongKeyword>(),
+		"ulong" => Token<ULongKeyword>(),
+		"void" => Token<VoidKeyword>(),
 		_ => null
 	};
 
@@ -292,6 +302,17 @@ public sealed record ImplKeyword : Keyword;
 public sealed record FuncKeyword : Keyword;
 public sealed record VarKeyword : Keyword;
 public sealed record UnderscoreKeyword : Keyword;
+
+public abstract record TypeKeyword(string Keyword, string CoreLibType) : Keyword;
+public sealed record ByteKeyword() : TypeKeyword("byte", "Int8");
+public sealed record SByteKeyword() : TypeKeyword("sbyte", "Uint8");
+public sealed record ShortKeyword() : TypeKeyword("short", "Int16");
+public sealed record UShortKeyword() : TypeKeyword("ushort", "UInt16");
+public sealed record IntKeyword() : TypeKeyword("int", "Int32");
+public sealed record UIntKeyword() : TypeKeyword("uint", "UInt32");
+public sealed record LongKeyword() : TypeKeyword("long", "Int64");
+public sealed record ULongKeyword() : TypeKeyword("ulong", "UInt64");
+public sealed record VoidKeyword() : TypeKeyword("void", "Void");
 
 public sealed record OpenParen : LexerToken;
 public sealed record CloseParen : LexerToken;

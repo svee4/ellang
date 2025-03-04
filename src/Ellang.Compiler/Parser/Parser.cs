@@ -75,7 +75,21 @@ public sealed class Parser
 		};
 	}
 
-	public FunctionExpressionStatement ParseFunction()
+	public Identifier ParseIdentifier()
+	{
+		var first = Eat<IdentifierLiteral>().Value;
+		if (EatIf<DoubleColon>() is not null)
+		{
+			var second = Eat<IdentifierLiteral>().Value;
+			return new Identifier(second, first);
+		}
+		else
+		{
+			return new Identifier(first, null);
+		}
+	}
+
+	public FunctionDeclarationStatement ParseFunction()
 	{
 		using var scope = Scope();
 
@@ -112,9 +126,10 @@ public sealed class Parser
 			_ = Eat<CloseBrace>();
 		}
 
-		return new FunctionExpressionStatement(
+		return new FunctionDeclarationStatement(
 			returnType,
-			new Identifier(name.Value),
+			new Identifier(name.Value, null),
+			NodeList.From<string>([]),
 			NodeList.From(parameters),
 			NodeList.From(statements));
 
@@ -126,7 +141,7 @@ public sealed class Parser
 			_ = Eat<Colon>();
 			var type = ParseTypeRef();
 
-			return new FunctionParameter(new Identifier(identifier), type);
+			return new FunctionParameter(new Identifier(identifier, null), type);
 		}
 	}
 
@@ -194,12 +209,12 @@ public sealed class Parser
 			var type = ParseTypeRef();
 			_ = Eat<SemiColon>();
 
-			fields.Add(new StructFieldDeclaration(new Identifier(fieldName), type));
+			fields.Add(new StructFieldDeclaration(new Identifier(fieldName, null), type));
 		}
 
 		_ = Eat<CloseBrace>();
 
-		return new StructDeclarationStatement(new Identifier(structName), NodeList.From(fields));
+		return new StructDeclarationStatement(new Identifier(structName, null), NodeList.From<string>([]), NodeList.From(fields));
 	}
 
 	public VariableDeclarationStatement ParseVariableDeclaration()
@@ -215,7 +230,7 @@ public sealed class Parser
 		_ = Eat<Equal>();
 		var expr = ParseExpression();
 
-		return new VariableDeclarationStatement(new Identifier(name), type, expr);
+		return new VariableDeclarationStatement(new Identifier(name, null), type, expr);
 	}
 
 	public TypeRef ParseTypeRef()
@@ -228,7 +243,7 @@ public sealed class Parser
 			refCount++;
 		}
 
-		var identifier = Eat<IdentifierLiteral>().Value;
+		var identifier = ParseIdentifier();
 
 		List<TypeRef> generics = [];
 		if (EatIf<OpenAngleBracket>() is not null)
@@ -237,7 +252,7 @@ public sealed class Parser
 			_ = Eat<CloseAngleBracket>();
 		}
 
-		return new TypeRef(new Identifier(identifier), refCount, generics);
+		return new TypeRef(identifier, refCount, generics);
 	}
 
 	[SuppressMessage("Usage", "CA2254:Template should be a static expression", Justification = "Close enough")]
