@@ -1,5 +1,4 @@
 using Microsoft.Extensions.Logging;
-using System.Collections.Frozen;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
@@ -91,6 +90,7 @@ public sealed class Lexer(ILogger<Lexer> logger)
 	private Keyword? GetKeyword(string keyword) => keyword switch
 	{
 		"return" => Token<ReturnKeyword>(),
+		"yield" => Token<YieldKeyword>(),
 		"struct" => Token<StructKeyword>(),
 		"impl" => Token<ImplKeyword>(),
 		"func" => Token<FuncKeyword>(),
@@ -107,6 +107,7 @@ public sealed class Lexer(ILogger<Lexer> logger)
 		"ulong" => Token<ULongKeyword>(),
 		"void" => Token<VoidKeyword>(),
 		"string" => Token<StringKeyword>(),
+		"never" => Token<NeverKeyword>(),
 		_ => null
 	};
 
@@ -300,11 +301,13 @@ public sealed record IdentifierLiteral(string Value) : Literal;
 
 public abstract record Keyword : LexerToken;
 public sealed record ReturnKeyword : Keyword;
+public sealed record YieldKeyword : Keyword;
 public sealed record StructKeyword : Keyword;
 public sealed record ImplKeyword : Keyword;
 public sealed record FuncKeyword : Keyword;
 public sealed record VarKeyword : Keyword;
 public sealed record UnderscoreKeyword : Keyword;
+public sealed record NeverKeyword : Keyword;
 
 public abstract record TypeKeyword(string Keyword, string CoreLibType) : Keyword;
 public sealed record BoolKeyword() : TypeKeyword("bool", "Boolean");

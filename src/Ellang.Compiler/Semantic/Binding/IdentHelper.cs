@@ -20,13 +20,13 @@ public sealed class IdentHelper(Binder analyzer)
 		SymbolIdent.From(symbol, CurComp);
 
 	public static SymbolIdent ForStruct(StructDeclarationStatement st, string module) =>
-		SymbolIdent.From(FormatArity(st.Name.Value, st.TypeParameters.Nodes.Count), module);
+		SymbolIdent.From(FormatArity(st.Name.Value, st.TypeParameters.Count), module);
 
 	public SymbolIdent ForStructCurComp(StructDeclarationStatement st) =>
 		ForStruct(st, CurComp);
 
 	public static SymbolIdent ForNamedFunc(FunctionDeclarationStatement st, string module) =>
-		SymbolIdent.From(FormatArity(st.Name.Value, st.TypeParameters.Nodes.Count), module);
+		SymbolIdent.From(FormatArity(st.Name.Value, st.TypeParameters.Count), module);
 
 	public SymbolIdent ForNamedFuncCurComp(FunctionDeclarationStatement st) =>
 		ForNamedFunc(st, CurComp);

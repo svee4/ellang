@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Security.Cryptography.X509Certificates;
 using Ellang.Compiler.Parser;
 using Ellang.Compiler.Parser.Nodes;
 using Microsoft.Extensions.Logging;
@@ -59,7 +60,7 @@ public sealed class Binder
 
 		var returnType = BindTypeSyntaxToTypeSymbolOrGetUnbound(st.ReturnType);
 
-		var parameters = st.Parameters.Nodes
+		var parameters = st.Parameters
 			.Select(p => new FunctionParameterSymbol(
 				new LocalSymbolIdent(p.Name.Value),
 				BindTypeSyntaxToTypeSymbolOrGetUnbound(p.Type)))
@@ -79,7 +80,7 @@ public sealed class Binder
 	{
 		using var scope = Logger.BeginScope(nameof(CreateStructDeclarationSymbols));
 
-		var fields = st.Fields.Nodes
+		var fields = st.Fields
 			.Select(f => new StructFieldSymbol(
 				new LocalSymbolIdent(f.Name.Value),
 				BindTypeSyntaxToTypeSymbolOrGetUnbound(f.Type)))
@@ -150,40 +151,39 @@ public sealed class Binder
 
 		using (Logger.BeginScope("[operations]"))
 		{
-			foreach (var statement in func.Statements.Nodes)
+			foreach (var statement in func.Statements)
 			{
 				IOperation op;
 				switch (statement)
 				{
 					case FunctionCallExpression call:
 					{
-						op = parser.ParseExpression(call);
+						op = parser.ParseOperation(call);
 						break;
 					}
 					case AssignmentExpression ass:
 					{
-						op = parser.ParseExpression(ass);
+						op = parser.ParseOperation(ass);
 						break;
 					}
 					case VariableDeclarationStatement decl:
 					{
-						var ident = IdentHelper.ForLocalVariable(decl.Name.Value);
-						var type = BindUnboundTypeSymbol(BindTypeSyntaxToTypeSymbolOrGetUnbound(decl.Type));
-						var sym = new GlobalVariableSymbol(ident, type);
-
-						var init = parser.ParseExpression(decl.Initializer);
-						op = new VariableDeclarationOperation(sym, init);
-
-						var local = new LocalVariableSymbol(new LocalSymbolIdent(ident.Name), type);
-						SymbolManager.LocalVariablesManager.AddLocal(local);
-
+						op = ParseLocalVariableDeclaration(decl, parser.ParseOperation);
 						break;
 					}
-					case DiscardStatement st:
+					case DiscardExpression st:
 					{
-						op = parser.ParseExpression(st.Expression);
+						op = parser.ParseOperation(st.Expression);
 						break;
 					}
+					case ReturnExpression ret:
+					{
+						op = ret.Value is { } v
+							? new ReturnOperation(parser.ParseOperation(v)) 
+							: new ReturnOperation(null);
+						break;
+					}
+
 					case EmptyStatement: continue;
 					default: throw new InvalidOperationException($"Unexpected statement {statement}");
 				}
@@ -202,6 +202,28 @@ public sealed class Binder
 		SymbolManager.LocalVariablesManager.PopScope();
 	}
 
+	/// <summary>
+	/// Parses a variable declaration into an operation and adds the symbol to the local scope
+	/// </summary>
+	/// <param name="decl"></param>
+	/// <param name="initializerParser"></param>
+	/// <returns></returns>
+	public VariableDeclarationOperation ParseLocalVariableDeclaration(
+		VariableDeclarationStatement decl,
+		Func<IExpression, IOperation> initializerParser)
+	{
+		var ident = IdentHelper.ForLocalVariable(decl.Name.Value);
+		var type = BindUnboundTypeSymbol(BindTypeSyntaxToTypeSymbolOrGetUnbound(decl.Type));
+		var sym = new GlobalVariableSymbol(ident, type);
+
+		var init = initializerParser(decl.Initializer);
+
+		var local = new LocalVariableSymbol(new LocalSymbolIdent(ident.Name), type);
+		SymbolManager.LocalVariablesManager.AddLocal(local);
+
+		return new VariableDeclarationOperation(sym, init);
+	}
+
 	private void BindStructDeclarationSymbols(StructDeclarationStatement declaration)
 	{
 		using var scope = Logger.BeginScope(nameof(BindStructDeclarationSymbols));
@@ -212,7 +234,7 @@ public sealed class Binder
 
 		using (Logger.BeginScope("[{StructIdentifier} fields]", structIdent))
 		{
-			foreach (var field in declaration.Fields.Nodes)
+			foreach (var field in declaration.Fields)
 			{
 				var typeReferenceSymbol = BindUnboundTypeSymbol(BindTypeSyntaxToTypeSymbolOrGetUnbound(field.Type));
 				var fieldSymbol = new StructFieldSymbol(new LocalSymbolIdent(field.Name.Value), typeReferenceSymbol);
@@ -274,7 +296,13 @@ public sealed class Binder
 
 	private TypeReferenceSymbol BindTypeSyntaxToTypeSymbolOrGetUnbound(TypeRef type)
 	{
-		return MakeTypeSymbol(type, this);
+		return type.Identifier.Value switch
+		{
+			// TODO: possibly make a SpecialTypeKind enum 
+			"Core::Void" => new VoidTypeReferenceSymbol(),
+			"_::never" => new NeverTypeReferenceSymbol(),
+			_ => MakeTypeSymbol(type, this),
+		};
 
 		static TypeReferenceSymbol MakeTypeSymbol(TypeRef type, Binder binder)
 		{
@@ -307,14 +335,9 @@ public sealed class Binder
 
 	[SuppressMessage("Design", "CA1032:Implement standard exception constructors",
 		Justification = "I dont want to")]
-	public sealed class CouldNotBindTypeException : AnalyzerException
+	public sealed class CouldNotBindTypeException(string typeName) : AnalyzerException($"Could not bind type {typeName}")
 	{
-		public string TypeName { get; }
-
-		public CouldNotBindTypeException(string typeName) : base($"Could not bind type {typeName}")
-		{
-			TypeName = typeName;
-		}
+		public string TypeName { get; } = typeName;
 
 		public CouldNotBindTypeException(SymbolIdent ident) : this(ident.ToString()) { }
 	}

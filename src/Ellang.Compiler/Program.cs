@@ -5,7 +5,7 @@ func main(argc: int, argv: &&byte): int {
 	
 }
 
-func sample(value: &int, list: Core::List<int>): void {
+func sample(value: &int, list: Core::List<int>): int {
 	var another_ref: &int = value;
 	var deref: int = *value;
 	var x: int = deref + 3;
@@ -19,6 +19,13 @@ func sample(value: &int, list: Core::List<int>): void {
 	var bitwised: int = x & deref;
 
 	_ = sample(x, 3);
+
+	var ret: int = { 
+		var temp: int = 3;
+		yield temp;
+	};
+
+	return 3;
 }
 
 struct Test {

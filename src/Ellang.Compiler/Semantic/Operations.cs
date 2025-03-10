@@ -25,6 +25,22 @@ public sealed record MemberAccessOperation(IOperation Source, IMemberSymbol Memb
 	public TypeReferenceSymbol Type => Member.Type;
 }
 
+public sealed record ReturnOperation(IOperation? Value) : IOperation
+{
+	public TypeReferenceSymbol Type => Value?.Type ?? new VoidTypeReferenceSymbol();
+}
+
+public sealed record YieldOperation(IOperation? Value) : IOperation
+{
+	public TypeReferenceSymbol Type => Value?.Type ?? new VoidTypeReferenceSymbol();
+}
+
+public sealed record BlockExpressionOperation(List<IOperation> Operations, TypeReferenceSymbol Type) : IOperation;
+public sealed record DiscardOperation(IOperation Value) : IOperation
+{
+	public TypeReferenceSymbol Type => Value.Type;
+}
+
 public abstract record LiteralOperation(TypeReferenceSymbol Type) : IOperation;
 public sealed record StringLiteralOperation(string Value, TypeReferenceSymbol StringType) : LiteralOperation(StringType);
 public sealed record IntegerLiteralOperation(int Value, TypeReferenceSymbol IntegerType) : LiteralOperation(IntegerType);

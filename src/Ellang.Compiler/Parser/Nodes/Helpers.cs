@@ -23,6 +23,7 @@ public sealed record Identifier(string Value, string? Module)
 /// </summary>
 public record TypeRef(Identifier Identifier, int PointerCount, List<TypeRef> Generics, string? OriginalIdentifier);
 
+[Obsolete("Use EquatableList")]
 public sealed record NodeList<T>(List<T> Nodes)
 {
 	public override string ToString() => string.Join(", ", Nodes);
@@ -30,5 +31,6 @@ public sealed record NodeList<T>(List<T> Nodes)
 
 public static class NodeList
 {
+	[Obsolete("Use EquatableList")]
 	public static NodeList<T> From<T>(IEnumerable<T> source) => new NodeList<T>(source.ToList());
 }

@@ -77,5 +77,7 @@ public sealed class AFcukingCompilation(string moduleName)
 		binder.SymbolManager.GlobalStructTable.Add(listSymbol);
 
 		binder.Bind(result);
+
+		_ = 1;
 	}
 }

@@ -12,7 +12,7 @@ public interface INamedSymbol
 public interface IMemberSymbol : INamedSymbol
 {
 	TypeReferenceSymbol Type { get; }
-	LocalSymbolIdent LocalIdent => ((INamedSymbol)this).Ident.AsLocal();
+	LocalSymbolIdent LocalIdent => Ident.AsLocal();
 }
 
 public sealed record ModuleSymbol(string Name);
@@ -107,6 +107,9 @@ public sealed record StructMethodSymbol(
 
 public abstract record TypeReferenceSymbol(SymbolIdent Ident);
 public abstract record NamedTypeReferenceSymbol(INamedSymbol Symbol) : TypeReferenceSymbol(Symbol.Ident);
+
+public sealed record NeverTypeReferenceSymbol() : TypeReferenceSymbol(SymbolIdent.From("never", "_"));
+public sealed record VoidTypeReferenceSymbol() : TypeReferenceSymbol(SymbolIdent.CoreLib("Void"));
 
 public sealed record StructTypeReferenceSymbol(StructSymbol Source) : NamedTypeReferenceSymbol(Source);
 public sealed record TraitReferenceTypeSymbol(TraitSymbol Source) : NamedTypeReferenceSymbol(Source);

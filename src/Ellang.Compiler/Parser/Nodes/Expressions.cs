@@ -1,13 +1,29 @@
+using Ellang.Compiler.Infra;
+
 namespace Ellang.Compiler.Parser.Nodes;
 
 public interface IExpression;
 
-public sealed record StringLiteralExpression(string Value) : IExpression;
-public sealed record IntLiteralExpression(int Value) : IExpression;
+public interface IExpressionStatement : IExpression, IStatement;
+
+public sealed record FunctionCallExpression(IExpression FunctionExpression, EquatableList<FunctionArgument> Arguments) : IExpressionStatement;
+public sealed record IndexerCallExpression(IExpression Source, IExpression Indexer) : IExpression;
+public sealed record FunctionArgument(IExpression Value);
+
+public sealed record AssignmentExpression(IExpression Target, IExpression Value) : IExpressionStatement;
+public sealed record DiscardExpression(IExpression Expression) : IExpressionStatement;
 
 public sealed record IdentifierExpression(Identifier Identifier) : IExpression;
-public sealed record IndexerCallExpression(IExpression Source, IExpression Indexer) : IExpression;
+public sealed record BlockExpression(List<IExpressionStatement> Statements) : IExpression;
+
+public sealed record ReturnExpression(IExpression? Value) : IExpressionStatement;
+public sealed record YieldExpression(IExpression? Value) : IExpressionStatement;
+
 public sealed record MemberAccessExpression(IExpression Source, IdentifierExpression Member) : IExpression;
+public sealed record EmptyStatement : IExpressionStatement;
+
+public sealed record StringLiteralExpression(string Value) : IExpression;
+public sealed record IntLiteralExpression(int Value) : IExpression;
 
 public abstract record BinaryExpression(IExpression Left, IExpression Right) : IExpression;
 

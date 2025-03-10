@@ -1,17 +1,16 @@
 using Ellang.Compiler.Infra;
 using Ellang.Compiler.Parser.Nodes;
-using System.ComponentModel.Design;
 using System.Diagnostics;
 
 namespace Ellang.Compiler.Semantic.Binding;
 
 public sealed class OperationParser(Binder analyzer)
 {
-	private readonly Binder _analyzer = analyzer;
+	private readonly Binder _binder = analyzer;
 
-	public IOperation ParseExpression(IExpression expr)
+	public IOperation ParseOperation(IExpression expr)
 	{
-		using var scope = _analyzer.Logger.BeginScope(nameof(ParseExpression));
+		using var scope = _binder.Logger.BeginScope(nameof(ParseOperation));
 
 		var visitor = new Visitors.ExpressionVisitor<IOperation>
 		{
@@ -21,8 +20,8 @@ public sealed class OperationParser(Binder analyzer)
 				{
 					case IdentifierExpression idexpr:
 					{
-						var functionIdent = _analyzer.IdentHelper.FromIdentifier(idexpr.Identifier);
-						var function = _analyzer.SymbolManager.GlobalFunctionTable.Get(functionIdent);
+						var functionIdent = _binder.IdentHelper.FromIdentifier(idexpr.Identifier);
+						var function = _binder.SymbolManager.GlobalFunctionTable.Get(functionIdent);
 						var args = expr.Arguments.Select(arg => v.Visit(arg.Value)).ToList();
 						return new InvocationOperation(function, args);
 					}
@@ -31,7 +30,7 @@ public sealed class OperationParser(Binder analyzer)
 						var source = v.Visit(memxpr.Source);
 
 						var sourceTypeIdent = source.Type.Ident;
-						var sourceStruct = _analyzer.SymbolManager.GlobalStructTable.Get(sourceTypeIdent);
+						var sourceStruct = _binder.SymbolManager.GlobalStructTable.Get(sourceTypeIdent);
 
 						var targetIdentName = memxpr.Member.Identifier.Value;
 						var targetIdent = new LocalSymbolIdent(targetIdentName);
@@ -88,38 +87,38 @@ public sealed class OperationParser(Binder analyzer)
 			},
 			StringLiteralExpressionVisitor = (expr, v) =>
 			{
-				var stringSymbol = _analyzer.SymbolManager.GlobalStructTable.Get(SymbolIdent.CoreLib("String"));
+				var stringSymbol = _binder.SymbolManager.GlobalStructTable.Get(SymbolIdent.CoreLib("String"));
 				var stringSymbolRef = new StructTypeReferenceSymbol(stringSymbol);
 				return new StringLiteralOperation(expr.Value, stringSymbolRef);
 			},
 			IntLiteralExpressionVisitor = (expr, v) =>
 			{
-				var intSymbol = _analyzer.SymbolManager.GlobalStructTable.Get(SymbolIdent.CoreLib("Int32"));
+				var intSymbol = _binder.SymbolManager.GlobalStructTable.Get(SymbolIdent.CoreLib("Int32"));
 				var intSymbolRef = new StructTypeReferenceSymbol(intSymbol);
 				return new IntegerLiteralOperation(expr.Value, intSymbolRef);
 			},
 
 			IdentifierExpressionVisitor = (expr, v) =>
 			{
-				var ident = _analyzer.IdentHelper.FromIdentifier(expr.Identifier);
+				var ident = _binder.IdentHelper.FromIdentifier(expr.Identifier);
 
-				if (_analyzer.SymbolManager.LocalVariablesManager.TryGet(expr.Identifier.Value, out var sym))
+				if (_binder.SymbolManager.LocalVariablesManager.TryGet(expr.Identifier.Value, out var sym))
 				{
 					return new LocalVariableReferenceOperation(sym);
 				}
-				else if (_analyzer.SymbolManager.GlobalVariableTable.TryGet(ident, out var sym2))
+				else if (_binder.SymbolManager.GlobalVariableTable.TryGet(ident, out var sym2))
 				{
 					return new GlobalVariableReferenceOperation(sym2);
 				}
-				else if (_analyzer.SymbolManager.GlobalStructTable.TryGet(ident, out var sym3))
+				else if (_binder.SymbolManager.GlobalStructTable.TryGet(ident, out var sym3))
 				{
 					return new StructReferenceOperation(sym3);
 				}
-				else if (_analyzer.SymbolManager.GlobalTraitTable.TryGet(ident, out var sym4))
+				else if (_binder.SymbolManager.GlobalTraitTable.TryGet(ident, out var sym4))
 				{
 					return new TraitReferenceOperation(sym4);
 				}
-				else if (_analyzer.SymbolManager.GlobalFunctionTable.TryGet(ident, out var sym5))
+				else if (_binder.SymbolManager.GlobalFunctionTable.TryGet(ident, out var sym5))
 				{
 					return new FunctionReferenceOperation(sym5);
 				}
@@ -131,6 +130,45 @@ public sealed class OperationParser(Binder analyzer)
 
 			IndexerCallExpressionVisitor = (expr, v) =>
 				throw new NotImplementedException("Indexers are not supported (yet)"),
+
+			BlockExpressionVisitor = (expr, v) =>
+			{
+				List<IOperation> operations = [];
+				TypeReferenceSymbol? type = null;
+
+				foreach (var st in expr.Statements)
+				{
+					var op = v.Visit(st);
+					operations.Add(op);
+
+					if (op is YieldOperation yieldOp)
+					{
+						if (type is null)
+						{
+							type = yieldOp.Type;
+						}
+						else
+						{
+							if (yieldOp.Type != type)
+							{
+								throw new InvalidOperationException($"Expected type {type}, got type {yieldOp.Type}");
+							}
+						}
+					}
+				}
+
+				if (type is null)
+				{
+					throw new InvalidOperationException("Block expression must yield");
+				}
+
+				return new BlockExpressionOperation(operations, type);
+			},
+			DiscardExpressionVisitor = (expr, v) => new DiscardOperation(v.Visit(expr)),
+			ReturnExpressionVisitor = (expr, v) => new ReturnOperation(expr.Value is { } val ? v.Visit(val) : null),
+			YieldExpressionVisitor = (expr, v) => new YieldOperation(expr.Value is { } val ? v.Visit(val) : null),
+
+			VariableDeclarationStatementVisitor = (expr, v) => _binder.ParseLocalVariableDeclaration(expr, v.Visit),
 
 			AdditionExpressionVisitor = (expr, v) => new AdditionOperation(v.Visit(expr.Left), v.Visit(expr.Right)),
 			SubtractionExpressionVisitor = (expr, v) => new SubtractionOperation(v.Visit(expr.Left), v.Visit(expr.Right)),

@@ -1,3 +1,4 @@
+using Ellang.Compiler.Lexer;
 using Ellang.Compiler.Parser.Nodes;
 using System.Globalization;
 using System.Text;
@@ -27,7 +28,7 @@ public sealed class SyntaxTree
 					w.Append(func.Name.Value);
 
 					w.Append('(');
-					foreach (var p in func.Parameters.Nodes)
+					foreach (var p in func.Parameters)
 					{
 						w.Append(p.Name.Value);
 						w.Append(": ");
@@ -43,7 +44,7 @@ public sealed class SyntaxTree
 					w.AppendLine();
 					w.AddIndent();
 
-					foreach (var st in func.Statements.Nodes)
+					foreach (var st in func.Statements)
 					{
 						w.AppendIndentation();
 						switch (st)
@@ -60,7 +61,7 @@ public sealed class SyntaxTree
 								w.AppendLine();
 								break;
 							}
-							case DiscardStatement discard:
+							case DiscardExpression discard:
 							{
 								w.Append("_ = ");
 								w.Append(ExpressionToString(discard.Expression));
@@ -72,7 +73,27 @@ public sealed class SyntaxTree
 								w.Append(";");
 								break;
 							}
-							default: throw new NotSupportedException();
+							case ReturnExpression ret:
+							{
+								w.Append("return");
+								if (ret.Value is { } v)
+								{
+									w.Append(" " + ExpressionToString(v));
+								}
+								w.Append(";");
+								break;
+							}
+							case YieldExpression yld:
+							{
+								w.Append("return");
+								if (yld.Value is { } v)
+								{
+									w.Append(" " + ExpressionToString(v));
+								}
+								w.Append(";");
+								break;
+							}
+							case var idk: throw new NotSupportedException(idk.ToString());
 						}
 					}
 
@@ -90,7 +111,7 @@ public sealed class SyntaxTree
 					w.AppendLine();
 					w.AddIndent();
 
-					foreach (var field in s.Fields.Nodes)
+					foreach (var field in s.Fields)
 					{
 						w.AppendIndentation();
 						w.Append(field.Name.Value);
@@ -132,6 +153,16 @@ public sealed class SyntaxTree
 			IndexerCallExpression f => $"{ExpressionToString(f.Source)}({ExpressionToString(f.Indexer)})",
 			MemberAccessExpression f => $"{ExpressionToString(f.Source)}.{ExpressionToString(f.Member)}",
 
+			VariableDeclarationStatement v => v.Initializer is null ? $"var {v.Name};" : $"var {v.Name} = {ExpressionToString(v.Initializer)}",
+
+			BlockExpression b => $$"""
+{
+	{{string.Join(";", b.Statements.Select(ExpressionToString))}}
+}
+""",
+
+			YieldExpression e => e.Value is null ? "yield;" : $"yield {ExpressionToString(e.Value)};",
+			ReturnExpression r => r.Value is null ? "return;" : $"return {ExpressionToString(r.Value)};",
 
 			BinaryExpression bin => $"{ExpressionToString(bin.Left)} {GetBinaryExpressionOperator(bin)} {ExpressionToString(bin.Right)}",
 

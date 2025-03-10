@@ -113,14 +113,14 @@ public sealed class Parser
 		_ = Eat<Colon>();
 		var returnType = ParseTypeRef();
 
-		List<IStatement> statements = [];
+		List<IExpressionStatement> statements = [];
 		using (Scope("[Statements]"))
 		{
 			_ = Eat<OpenBrace>();
 
 			while (Peek() is not CloseBrace)
 			{
-				statements.Add(ParseStatement());
+				statements.Add(ParseExpressionStatement());
 			}
 
 			_ = Eat<CloseBrace>();
@@ -129,9 +129,9 @@ public sealed class Parser
 		return new FunctionDeclarationStatement(
 			returnType,
 			new Identifier(name.Value, null),
-			NodeList.From<string>([]),
-			NodeList.From(parameters),
-			NodeList.From(statements));
+			[],
+			parameters,
+			statements);
 
 		FunctionParameter ParseFunctionParameter()
 		{
@@ -145,21 +145,13 @@ public sealed class Parser
 		}
 	}
 
-	public IStatement ParseStatement()
+	public IExpressionStatement ParseExpressionStatement()
 	{
 		using var scope = Scope();
 
-		switch (Peek())
+		var token = Peek();
+		switch (token)
 		{
-			case SemiColon:
-			{
-				_ = Eat<SemiColon>();
-				return new EmptyStatement();
-			}
-			case FuncKeyword:
-			{
-				return ParseFunction();
-			}
 			case VarKeyword:
 			{
 				var expr = ParseVariableDeclaration();
@@ -172,23 +164,44 @@ public sealed class Parser
 				_ = Eat<Equal>();
 				var expr = ParseExpression();
 				_ = Eat<SemiColon>();
-				return new DiscardStatement(expr);
+				return new DiscardExpression(expr);
+			}
+			case ReturnKeyword:
+			{
+				_ = Eat<ReturnKeyword>();
+				var expr = Peek() switch
+				{
+					SemiColon => null,
+					_ => ParseExpression()
+				};
+				_ = Eat<SemiColon>();
+				return new ReturnExpression(expr);
+			}
+			case YieldKeyword:
+			{
+				_ = Eat<YieldKeyword>();
+				var expr = Peek() switch
+				{
+					SemiColon => null,
+					_ => ParseExpression()
+				};
+				_ = Eat<SemiColon>();
+				return new YieldExpression(expr);
 			}
 			default:
 			{
-				ThrowAt(Peek(), "Expected statement");
-				throw new UnreachableException();
+				return ParseExpression() switch
+				{
+					IExpressionStatement st => st,
+					var res => ThrowAt<IExpressionStatement>(token, "Expected expression statement, got {Actual}", res)
+				};
 			}
 		}
 	}
 
-	public IExpression ParseExpression()
-	{
-		using var scope = Scope();
-		return ExpressionParser.ParseExpression(Precedence.None);
-	}
+	public IExpression ParseExpression() =>
+		ExpressionParser.ParseExpression(Precedence.None);
 
-	// convenience shortcut
 	public IExpression ParseSubExpression(Precedence precedence) =>
 		ExpressionParser.ParseExpression(precedence);
 
@@ -214,7 +227,7 @@ public sealed class Parser
 
 		_ = Eat<CloseBrace>();
 
-		return new StructDeclarationStatement(new Identifier(structName, null), NodeList.From<string>([]), NodeList.From(fields));
+		return new StructDeclarationStatement(new Identifier(structName, null), [], fields);
 	}
 
 	public VariableDeclarationStatement ParseVariableDeclaration()

@@ -10,10 +10,8 @@ public sealed class ExpressionParser(Parser parser)
 {
 	private readonly Parser _parser = parser;
 
-	private IDisposable? Scope(Precedence? precedence, [CallerMemberName] string caller = "")
-	{
-		return _parser.Scope($"{nameof(ExpressionParser)}.{caller}{(precedence is null ? null : $"@{precedence}")}" );
-	}
+	private IDisposable? Scope(Precedence precedence) =>
+		_parser.Scope($"{nameof(ParseExpression)}@{precedence}");
 
 	public IExpression ParseExpression(Precedence precedence)
 	{
@@ -52,6 +50,7 @@ public sealed class ExpressionParser(Parser parser)
 		Minus =>		new PrefixOperatorParselet<Minus>(),
 		Star =>			new PrefixOperatorParselet<Star>(),
 		OpenParen =>	new GroupingParselet(),
+		OpenBrace =>	new BlockExpressionParselet(),
 		StringLiteral =>	new LiteralParselet<StringLiteral>(),
 		NumericLiteral =>	new LiteralParselet<NumericLiteral>(),
 		IdentifierLiteral =>	new IdentifierParselet(),
