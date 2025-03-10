@@ -7,6 +7,7 @@ public sealed record IntLiteralExpression(int Value) : IExpression;
 
 public sealed record IdentifierExpression(Identifier Identifier) : IExpression;
 public sealed record IndexerCallExpression(IExpression Source, IExpression Indexer) : IExpression;
+public sealed record MemberAccessExpression(IExpression Source, IdentifierExpression Member) : IExpression;
 
 public abstract record BinaryExpression(IExpression Left, IExpression Right) : IExpression;
 

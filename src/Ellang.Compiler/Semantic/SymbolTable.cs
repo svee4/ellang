@@ -1,8 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
 
-namespace Ellang.Compiler.AST;
+namespace Ellang.Compiler.Semantic;
 
-public abstract class SymbolTable<T>(SymbolTableManager manager) where T : GlobalSymbol
+public abstract class SymbolTable<T>(SymbolTableManager manager) where T : INamedSymbol
 {
 	protected SymbolTableManager Manager { get; } = manager;
 	protected Dictionary<SymbolIdent, T> SymbolMap { get; } = [];
@@ -19,7 +19,7 @@ public abstract class SymbolTable<T>(SymbolTableManager manager) where T : Globa
 			return true;
 		}
 
-		symbol = null;
+		symbol = default;
 		return false;
 	}
 
@@ -30,13 +30,16 @@ public abstract class SymbolTable<T>(SymbolTableManager manager) where T : Globa
 	}
 
 	public T Get(SymbolIdent ident) =>
-		SymbolMap[ident];
+		SymbolMap.TryGetValue(ident, out var value)
+			? value
+			: throw new InvalidOperationException($"Could not find symbol {ident}");
 
 	public void Update(SymbolIdent ident, Func<T, T> updater) =>
 		SymbolMap[ident] = updater(SymbolMap[ident]);
 }
 
-public sealed class VariableTable(SymbolTableManager manager) : SymbolTable<VariableSymbol>(manager);
+public sealed class GlobalVariableTable(SymbolTableManager manager) : SymbolTable<GlobalVariableSymbol>(manager);
+public sealed class LocalVariableTable(SymbolTableManager manager) : SymbolTable<LocalVariableSymbol>(manager);
 public sealed class StructTable(SymbolTableManager manager) : SymbolTable<StructSymbol>(manager);
 public sealed class TraitTable(SymbolTableManager manager) : SymbolTable<TraitSymbol>(manager);
 public sealed class FunctionTable(SymbolTableManager manager) : SymbolTable<NamedFunctionSymbol>(manager);

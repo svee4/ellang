@@ -1,10 +1,10 @@
-using Ellang.Compiler.AST;
-using Ellang.Compiler.AST.Binding;
+using Ellang.Compiler.Semantic.Binding;
 using Ellang.Compiler.Infra;
+using Ellang.Compiler.Semantic;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
-namespace Ellang.Compiler.Compilation;
+namespace Ellang.Compiler;
 
 public sealed class AFcukingCompilation(string moduleName)
 {
@@ -37,7 +37,7 @@ public sealed class AFcukingCompilation(string moduleName)
 		Console.WriteLine();
 		Console.WriteLine(reconstructed);
 
-		var binder = new Binder(this);
+		var binder = new Binder(this, new ConsoleLogger<Binder>(LogLevel));
 
 		var coreLibModule = new ModuleSymbol(Constants.CoreLibModuleName);
 
@@ -48,18 +48,33 @@ public sealed class AFcukingCompilation(string moduleName)
 					SymbolIdent.From(coreLibTypeName, Constants.CoreLibModuleName),
 					[],
 					[],
+					[],
 					null
 				));
 		}
 
 		var listSymbol = new StructSymbol(
-			new SymbolIdent("List", coreLibModule),
-			[new TypeParameterSymbol("T")],
-			[new StructFieldSymbol("Count", 
+			SymbolIdent.CoreLib("List`1"),
+			[new TypeParameterSymbol(new LocalSymbolIdent("T"))],
+			[new StructFieldSymbol(new LocalSymbolIdent("Count"),
 				new StructTypeReferenceSymbol(
 					binder.SymbolManager.GlobalStructTable.Get(
 						SymbolIdent.From("Int32", Constants.CoreLibModuleName))))],
+			[new StructMethodSymbol(
+				new NamedFunctionSymbol(
+					new LocalSymbolIdent("At").AsGlobal(),
+					new TypeParameterTypeReferenceSymbol(new TypeParameterSymbol(new LocalSymbolIdent("T"))),
+					[new TypeParameterSymbol(new LocalSymbolIdent("T"))],
+					[new FunctionParameterSymbol(
+						new LocalSymbolIdent("index"), 
+						new StructTypeReferenceSymbol(
+							binder.SymbolManager.GlobalStructTable.Get(SymbolIdent.CoreLib("Int32"))))],
+					[],
+					null),
+				null)],
 			null);
+
+		binder.SymbolManager.GlobalStructTable.Add(listSymbol);
 
 		binder.Bind(result);
 	}

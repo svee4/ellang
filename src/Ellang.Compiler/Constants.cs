@@ -9,6 +9,7 @@ public static class Constants
 
 	public static IReadOnlyList<(string Keyword, string CoreLibTypeName)> TypeKeywords =>
 	[
+		("bool", "Boolean"),
 		("byte", "UInt8"),
 		("sbyte", "Int8"),
 		("short", "Int16"),
@@ -18,5 +19,6 @@ public static class Constants
 		("long", "Int64"),
 		("ulong", "UInt64"),
 		("void", "Void"),
+		("string", "String")
 	];
 }

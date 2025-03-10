@@ -60,6 +60,7 @@ public sealed class ExpressionParser(Parser parser)
 
 	private IInfixParselet? GetInfixParseletForToken(LexerToken token) => token switch
 	{
+		Dot =>		new MemberAccessParselet(),
 		Equal =>	new AssignmentParselet(),
 		Plus =>		new BinaryOperatorParselet<Plus>(_parser),
 		Minus =>	new BinaryOperatorParselet<Minus>(_parser),

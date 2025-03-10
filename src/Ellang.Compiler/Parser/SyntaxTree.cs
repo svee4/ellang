@@ -130,6 +130,8 @@ public sealed class SyntaxTree
 			AssignmentExpression ass => $"{ExpressionToString(ass.Target)} = {ExpressionToString(ass.Value)}",
 			FunctionCallExpression f => $"{ExpressionToString(f.FunctionExpression)}({string.Join(", ", f.Arguments.Select(arg => ExpressionToString(arg.Value)))})",
 			IndexerCallExpression f => $"{ExpressionToString(f.Source)}({ExpressionToString(f.Indexer)})",
+			MemberAccessExpression f => $"{ExpressionToString(f.Source)}.{ExpressionToString(f.Member)}",
+
 
 			BinaryExpression bin => $"{ExpressionToString(bin.Left)} {GetBinaryExpressionOperator(bin)} {ExpressionToString(bin.Right)}",
 

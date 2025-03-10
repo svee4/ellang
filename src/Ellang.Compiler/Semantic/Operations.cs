@@ -1,30 +1,63 @@
-using Ellang.Compiler.Parser.Nodes;
+namespace Ellang.Compiler.Semantic;
 
-namespace Ellang.Compiler.AST;
+public interface IOperation
+{
+	TypeReferenceSymbol Type { get; }
+}
 
-public interface IOperation;
+public sealed record VariableDeclarationOperation(GlobalVariableSymbol Variable, IOperation? Initializer) : IOperation
+{
+	public TypeReferenceSymbol Type => Variable.Type;
+}
 
-public sealed record VariableDeclarationOperation(VariableSymbol Variable, IOperation? Initializer) : IOperation;
-public sealed record InvocationOperation(IFunctionSymbol Target, List<IOperation> Arguments) : IOperation;
-public sealed record AssignmentOperation(IOperation Target, IOperation Value) : IOperation;
+public sealed record InvocationOperation(IFunctionSymbol Target, List<IOperation> Arguments) : IOperation
+{
+	public TypeReferenceSymbol Type => Target.ReturnType;
+}
 
-public abstract record LiteralOperation : IOperation;
-public sealed record StringLiteralOperation(string Value) : LiteralOperation;
-public sealed record IntegerLiteralOperation(int Value) : LiteralOperation;
+public sealed record AssignmentOperation(IOperation Target, IOperation Value) : IOperation
+{
+	public TypeReferenceSymbol Type => Value.Type;
+}
 
-public abstract record BinaryOperation(IOperation Left, IOperation Right) : IOperation;
+public sealed record MemberAccessOperation(IOperation Source, IMemberSymbol Member) : IOperation
+{
+	public TypeReferenceSymbol Type => Member.Type;
+}
+
+public abstract record LiteralOperation(TypeReferenceSymbol Type) : IOperation;
+public sealed record StringLiteralOperation(string Value, TypeReferenceSymbol StringType) : LiteralOperation(StringType);
+public sealed record IntegerLiteralOperation(int Value, TypeReferenceSymbol IntegerType) : LiteralOperation(IntegerType);
+
+public abstract record BinaryOperation : IOperation
+{
+	public IOperation Left { get; }
+	public IOperation Right { get; }
+
+	protected BinaryOperation(IOperation left, IOperation right)
+	{
+		if (left.Type != right.Type)
+		{
+			throw new ArgumentException(
+				$"Binary operator arguments {left} and {right} types {left.Type} and {right.Type} are not compatible");
+		}
+
+		Left = left;
+		Right = right;
+	}
+
+	public TypeReferenceSymbol Type => Left.Type;
+}
 
 public sealed record AdditionOperation(IOperation Left, IOperation Right) : BinaryOperation(Left, Right);
 public sealed record SubtractionOperation(IOperation Left, IOperation Right) : BinaryOperation(Left, Right);
 public sealed record MultiplicationOperation(IOperation Left, IOperation Right) : BinaryOperation(Left, Right);
 public sealed record DivisionOperation(IOperation Left, IOperation Right) : BinaryOperation(Left, Right);
-
 public sealed record BitwiseAndOperation(IOperation Left, IOperation Right) : BinaryOperation(Left, Right);
 public sealed record BitwiseOrOperation(IOperation Left, IOperation Right) : BinaryOperation(Left, Right);
 public sealed record BitwiseXorOperation(IOperation Left, IOperation Right) : BinaryOperation(Left, Right);
 public sealed record BitwiseLeftShiftOperation(IOperation Left, IOperation Right) : BinaryOperation(Left, Right);
 public sealed record BitwiseRightShiftOperation(IOperation Left, IOperation Right) : BinaryOperation(Left, Right);
-
 public sealed record LogicalAndOperation(IOperation Left, IOperation Right) : BinaryOperation(Left, Right);
 public sealed record LogicalOrOperation(IOperation Left, IOperation Right) : BinaryOperation(Left, Right);
 public sealed record LogicalLessThanOperation(IOperation Left, IOperation Right) : BinaryOperation(Left, Right);
@@ -32,17 +65,41 @@ public sealed record LogicalGreaterThanOperation(IOperation Left, IOperation Rig
 public sealed record LogicalEqualOperation(IOperation Left, IOperation Right) : BinaryOperation(Left, Right);
 public sealed record LogicalNotEqualOperation(IOperation Left, IOperation Right) : BinaryOperation(Left, Right);
 
-public abstract record UnaryOperation(IOperation Source) : IOperation;
+public abstract record UnaryOperation(IOperation Source, TypeReferenceSymbol ResultType) : IOperation
+{
+	public TypeReferenceSymbol Type => Source.Type;
+}
 
-public sealed record LogicalNegationOperation(IOperation Source) : UnaryOperation(Source);
-public sealed record MathematicalNegationOperation(IOperation Source) : UnaryOperation(Source);
-public sealed record BitwiseNotOperation(IOperation Source) : UnaryOperation(Source);
-public sealed record DereferenceOperation(IOperation Source) : UnaryOperation(Source);
+public sealed record LogicalNegationOperation(IOperation Source, TypeReferenceSymbol ResultType) : UnaryOperation(Source, ResultType);
+public sealed record MathematicalNegationOperation(IOperation Source, TypeReferenceSymbol ResultType) : UnaryOperation(Source, ResultType);
+public sealed record BitwiseNotOperation(IOperation Source, TypeReferenceSymbol ResultType) : UnaryOperation(Source, ResultType);
+public sealed record DereferenceOperation(IOperation Source, TypeReferenceSymbol ResultType) : UnaryOperation(Source, ResultType);
 
 ////////////////////////////
 
-public sealed record LocalVariableReferenceOperation(VariableSymbol Symbol) : IOperation;
-public sealed record GlobalVariableReferenceOperation(VariableSymbol Symbol) : IOperation;
-public sealed record FunctionReferenceOperation(NamedFunctionSymbol Symbol) : IOperation;
-public sealed record StructReferenceOperation(StructSymbol Symbol) : IOperation;
-public sealed record TraitReferenceOperation(TraitSymbol Symbol) : IOperation;
+public sealed record LocalVariableReferenceOperation(LocalVariableSymbol Symbol) : IOperation
+{
+	public TypeReferenceSymbol Type => Symbol.Type;
+}
+
+public sealed record GlobalVariableReferenceOperation(GlobalVariableSymbol Symbol) : IOperation
+{
+	public TypeReferenceSymbol Type => Symbol.Type;
+}
+
+public sealed record FunctionReferenceOperation(NamedFunctionSymbol Symbol) : IOperation
+{
+	public TypeReferenceSymbol Type => throw new NotImplementedException();
+}
+
+public sealed record StructReferenceOperation(StructSymbol Symbol) : IOperation
+{
+	public StructTypeReferenceSymbol Type => throw new NotImplementedException();
+	TypeReferenceSymbol IOperation.Type => Type;
+}
+
+public sealed record TraitReferenceOperation(TraitSymbol Symbol) : IOperation
+{
+	public TraitReferenceTypeSymbol Type => throw new NotImplementedException();
+	TypeReferenceSymbol IOperation.Type => Type;
+}

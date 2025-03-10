@@ -96,6 +96,7 @@ public sealed class Lexer(ILogger<Lexer> logger)
 		"func" => Token<FuncKeyword>(),
 		"var" => Token<VarKeyword>(),
 
+		"bool" => Token<BoolKeyword>(),
 		"byte" => Token<ByteKeyword>(),
 		"sbyte" => Token<SByteKeyword>(),
 		"short" => Token<ShortKeyword>(),
@@ -105,6 +106,7 @@ public sealed class Lexer(ILogger<Lexer> logger)
 		"long" => Token<LongKeyword>(),
 		"ulong" => Token<ULongKeyword>(),
 		"void" => Token<VoidKeyword>(),
+		"string" => Token<StringKeyword>(),
 		_ => null
 	};
 
@@ -159,6 +161,7 @@ public sealed class Lexer(ILogger<Lexer> logger)
 				'<' => Token<OpenAngleBracket>(),
 				'>' => Token<CloseAngleBracket>(),
 				',' => Token<Comma>(),
+				'.' => Token<Dot>(),
 				'+' => Token<Plus>(),
 				'-' => Token<Minus>(),
 				'*' => Token<Star>(),
@@ -304,6 +307,7 @@ public sealed record VarKeyword : Keyword;
 public sealed record UnderscoreKeyword : Keyword;
 
 public abstract record TypeKeyword(string Keyword, string CoreLibType) : Keyword;
+public sealed record BoolKeyword() : TypeKeyword("bool", "Boolean");
 public sealed record ByteKeyword() : TypeKeyword("byte", "Int8");
 public sealed record SByteKeyword() : TypeKeyword("sbyte", "Uint8");
 public sealed record ShortKeyword() : TypeKeyword("short", "Int16");
@@ -313,6 +317,7 @@ public sealed record UIntKeyword() : TypeKeyword("uint", "UInt32");
 public sealed record LongKeyword() : TypeKeyword("long", "Int64");
 public sealed record ULongKeyword() : TypeKeyword("ulong", "UInt64");
 public sealed record VoidKeyword() : TypeKeyword("void", "Void");
+public sealed record StringKeyword() : TypeKeyword("string", "String");
 
 public sealed record OpenParen : LexerToken;
 public sealed record CloseParen : LexerToken;
@@ -324,6 +329,7 @@ public sealed record OpenAngleBracket : LexerToken;
 public sealed record CloseAngleBracket : LexerToken;
 
 public sealed record Comma : LexerToken;
+public sealed record Dot : LexerToken;
 
 public sealed record Plus : LexerToken;
 public sealed record Minus : LexerToken;

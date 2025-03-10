@@ -9,6 +9,7 @@ public static class Visitors
 	{
 		public required Func<FunctionCallExpression, ExpressionVisitor<T>, T> FunctionCallExpressionVisitor { get; init; }
 		public required Func<AssignmentExpression, ExpressionVisitor<T>, T> AssignmentExpressionVisitor { get; init; }
+		public required Func<MemberAccessExpression, ExpressionVisitor<T>, T> MemberAccessExpressionVisitor { get; init; }
 
 		public required Func<StringLiteralExpression, ExpressionVisitor<T>, T> StringLiteralExpressionVisitor { get; init; }
 		public required Func<IntLiteralExpression, ExpressionVisitor<T>, T> IntLiteralExpressionVisitor { get; init; }

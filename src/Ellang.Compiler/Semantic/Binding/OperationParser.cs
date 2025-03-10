@@ -3,7 +3,7 @@ using Ellang.Compiler.Parser.Nodes;
 using System.ComponentModel.Design;
 using System.Diagnostics;
 
-namespace Ellang.Compiler.AST.Binding;
+namespace Ellang.Compiler.Semantic.Binding;
 
 public sealed class OperationParser(Binder analyzer)
 {
@@ -11,6 +11,8 @@ public sealed class OperationParser(Binder analyzer)
 
 	public IOperation ParseExpression(IExpression expr)
 	{
+		using var scope = _analyzer.Logger.BeginScope(nameof(ParseExpression));
+
 		var visitor = new Visitors.ExpressionVisitor<IOperation>
 		{
 			FunctionCallExpressionVisitor = (expr, v) =>
@@ -24,20 +26,87 @@ public sealed class OperationParser(Binder analyzer)
 						var args = expr.Arguments.Select(arg => v.Visit(arg.Value)).ToList();
 						return new InvocationOperation(function, args);
 					}
+					case MemberAccessExpression memxpr:
+					{
+						var source = v.Visit(memxpr.Source);
+
+						var sourceTypeIdent = source.Type.Ident;
+						var sourceStruct = _analyzer.SymbolManager.GlobalStructTable.Get(sourceTypeIdent);
+
+						var targetIdentName = memxpr.Member.Identifier.Value;
+						var targetIdent = new LocalSymbolIdent(targetIdentName);
+
+						IMemberSymbol member;
+
+						if (sourceStruct.Fields.FirstOrDefault(f => f.Ident == targetIdent) is { } field)
+						{
+							member = field;
+						}
+						else if (sourceStruct.Methods.FirstOrDefault(m => m.Ident == targetIdent) is { } method)
+						{
+							member = method;
+						}
+						else
+						{
+							throw new InvalidOperationException(
+								$"Struct {sourceStruct.Ident} does not contain a field named {targetIdent}");
+						}
+
+						return new MemberAccessOperation(source, member);
+					}
 					case { } ex: throw new UnreachableException($"Unhandled function call expression type {expr.GetType()}");
 					case null: throw new InvalidOperationException("Function call expression argument must not be null");
 				};
 			},
 			AssignmentExpressionVisitor = (expr, v) => new AssignmentOperation(v.Visit(expr.Target), v.Visit(expr.Value)),
+			MemberAccessExpressionVisitor = (expr, v) =>
+			{
+				var source = v.Visit(expr.Source);
 
-			StringLiteralExpressionVisitor = (expr, v) => new StringLiteralOperation(expr.Value),
-			IntLiteralExpressionVisitor = (expr, v) => new IntegerLiteralOperation(expr.Value),
+				var fieldIdent = new LocalSymbolIdent(expr.Member.Identifier.Value);
+
+				IMemberSymbol member;
+
+				if (source.Type is StructTypeReferenceSymbol st)
+				{
+					var maybeMember = st.Source.Fields.FirstOrDefault(field => field.Ident == fieldIdent);
+					if (maybeMember is not null)
+					{
+						member = maybeMember;
+					}
+					else
+					{
+						throw new InvalidOperationException($"Struct {st.Ident} does not contain a field named {fieldIdent}");
+					}
+				}
+				else
+				{
+					throw new UnreachableException($"Unhandled member access for type {source.Type}");
+				}
+
+				return new MemberAccessOperation(v.Visit(expr.Source), member);
+			},
+			StringLiteralExpressionVisitor = (expr, v) =>
+			{
+				var stringSymbol = _analyzer.SymbolManager.GlobalStructTable.Get(SymbolIdent.CoreLib("String"));
+				var stringSymbolRef = new StructTypeReferenceSymbol(stringSymbol);
+				return new StringLiteralOperation(expr.Value, stringSymbolRef);
+			},
+			IntLiteralExpressionVisitor = (expr, v) =>
+			{
+				var intSymbol = _analyzer.SymbolManager.GlobalStructTable.Get(SymbolIdent.CoreLib("Int32"));
+				var intSymbolRef = new StructTypeReferenceSymbol(intSymbol);
+				return new IntegerLiteralOperation(expr.Value, intSymbolRef);
+			},
+
 			IdentifierExpressionVisitor = (expr, v) =>
 			{
 				var ident = _analyzer.IdentHelper.FromIdentifier(expr.Identifier);
 
 				if (_analyzer.SymbolManager.LocalVariablesManager.TryGet(expr.Identifier.Value, out var sym))
+				{
 					return new LocalVariableReferenceOperation(sym);
+				}
 				else if (_analyzer.SymbolManager.GlobalVariableTable.TryGet(ident, out var sym2))
 				{
 					return new GlobalVariableReferenceOperation(sym2);
@@ -56,7 +125,7 @@ public sealed class OperationParser(Binder analyzer)
 				}
 				else
 				{
-					throw new Binder.CouldNotBindTypeException(expr.Identifier.Value);
+					throw new Binder.CouldNotBindTypeException(expr.Identifier.ToString());
 				}
 			},
 
@@ -81,10 +150,26 @@ public sealed class OperationParser(Binder analyzer)
 			LogicalEqualExpressionVisitor = (expr, v) => v.BinaryVisit(expr, (l, r) => new LogicalEqualOperation(l, r)),
 			LogicalNotEqualExpressionVisitor = (expr, v) => v.BinaryVisit(expr, (l, r) => new LogicalNotEqualOperation(l, r)),
 
-			LogicalNegationExpressionVisitor = (expr, v) => new LogicalNegationOperation(v.Visit(expr)),
-			MathematicalNegationExpressionVisitor = (expr, v) => new MathematicalNegationOperation(v.Visit(expr.Source)),
-			BitwiseNotExpressionVisitor = (expr, v) => new BitwiseNotOperation(v.Visit(expr.Source)),
-			DereferenceExpressionVisitor = (expr, v) => new DereferenceOperation(v.Visit(expr.Source)),
+			LogicalNegationExpressionVisitor = (expr, v) => 
+			{ 
+				var op = v.Visit(expr.Source);
+				return new LogicalNegationOperation(op, op.Type);
+			},
+			MathematicalNegationExpressionVisitor = (expr, v) => 
+			{
+				var op = v.Visit(expr.Source);
+				return new MathematicalNegationOperation(op, op.Type);
+			},
+			BitwiseNotExpressionVisitor = (expr, v) => 
+			{ 
+				var op = v.Visit(expr.Source);
+				return new BitwiseNotOperation(op, op.Type);
+			},
+			DereferenceExpressionVisitor = (expr, v) => 
+			{
+				var op = v.Visit(expr.Source);
+				return new DereferenceOperation(op, op.Type);
+			},
 		};
 
 		return visitor.Visit(expr);

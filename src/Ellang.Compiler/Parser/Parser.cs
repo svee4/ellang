@@ -237,13 +237,33 @@ public sealed class Parser
 	{
 		using var scope = Scope();
 
-		var refCount = 0;
+		var pcount = 0;
 		while (EatIf<Ampersand>() is not null)
 		{
-			refCount++;
+			pcount++;
 		}
 
-		var identifier = ParseIdentifier();
+
+		Identifier ident;
+		string? original = null;
+
+		var next = Peek();
+		if (next is IdentifierLiteral)
+		{
+			ident = ParseIdentifier();
+		}
+		else if (next is TypeKeyword kw)
+		{
+			_ = Eat<TypeKeyword>();
+			ident = Identifier.CoreLib(kw.CoreLibType);
+			original = kw.Keyword;
+		}
+		else
+		{
+			ThrowAt(next, "Expected {Expected1} or {Expected2}, got {Actual}",
+				typeof(IdentifierLiteral), typeof(TypeKeyword), next.GetType());
+			throw new UnreachableException();
+		}
 
 		List<TypeRef> generics = [];
 		if (EatIf<OpenAngleBracket>() is not null)
@@ -252,7 +272,7 @@ public sealed class Parser
 			_ = Eat<CloseAngleBracket>();
 		}
 
-		return new TypeRef(identifier, refCount, generics);
+		return new TypeRef(ident, pcount, generics, original);
 	}
 
 	[SuppressMessage("Usage", "CA2254:Template should be a static expression", Justification = "Close enough")]

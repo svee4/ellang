@@ -12,6 +12,11 @@ public sealed record StructDeclarationStatement(Identifier Name, NodeList<string
 
 public sealed record StructFieldDeclaration(Identifier Name, TypeRef Type);
 
+public sealed record ImplBlockStatement(StructMethodDeclarationStatement Methods);
+
+public sealed record StructMethodDeclarationStatement(TypeRef ReturnType, Identifier Name, NodeList<string> TypeParameters,
+	NodeList<FunctionParameter> Parameters, NodeList<IStatement> Statemets) : IStatement;
+
 public sealed record VariableDeclarationStatement(Identifier Name, TypeRef Type, IExpression Initializer) : IStatement;
 public sealed record DiscardStatement(IExpression Expression) : IStatement;
 

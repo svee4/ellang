@@ -1,6 +1,7 @@
 using Ellang.Compiler.Parser.Nodes;
+using Ellang.Compiler.Semantic;
 
-namespace Ellang.Compiler.AST.Binding;
+namespace Ellang.Compiler.Semantic.Binding;
 
 
 public sealed class IdentHelper(Binder analyzer)
@@ -24,11 +25,13 @@ public sealed class IdentHelper(Binder analyzer)
 	public SymbolIdent ForStructCurComp(StructDeclarationStatement st) =>
 		ForStruct(st, CurComp);
 
-	public static SymbolIdent ForFunc(FunctionDeclarationStatement st, string module) =>
+	public static SymbolIdent ForNamedFunc(FunctionDeclarationStatement st, string module) =>
 		SymbolIdent.From(FormatArity(st.Name.Value, st.TypeParameters.Nodes.Count), module);
 
-	public SymbolIdent ForFuncCurComp(FunctionDeclarationStatement st) =>
-		ForFunc(st, CurComp);
+	public SymbolIdent ForNamedFuncCurComp(FunctionDeclarationStatement st) =>
+		ForNamedFunc(st, CurComp);
+
+	public SymbolIdent ForAnonFunc() => throw new NotImplementedException();
 
 	public SymbolIdent ForTypeRef(TypeRef type) =>
 		SymbolIdent.From(FormatArity(type.Identifier.Value, type.Generics.Count), type.Identifier.Module ?? CurComp);

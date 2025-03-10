@@ -1,11 +1,11 @@
-using Ellang.Compiler.AST.Binding;
+using Ellang.Compiler.Semantic.Binding;
 using System.Diagnostics.CodeAnalysis;
 
-namespace Ellang.Compiler.AST;
+namespace Ellang.Compiler.Semantic;
 
 public sealed class SymbolTableManager
 {
-	public VariableTable GlobalVariableTable { get; private set; }
+	public GlobalVariableTable GlobalVariableTable { get; private set; }
 	public StructTable GlobalStructTable { get; private set; }
 	public TraitTable GlobalTraitTable { get; private set; }
 	public FunctionTable GlobalFunctionTable { get; private set; }
@@ -38,32 +38,30 @@ public sealed class SymbolTableManager
 
 public sealed class LocalVariablesManager(SymbolTableManager manager)
 {
-	private SymbolTableManager _manager = manager;
+	private readonly SymbolTableManager _manager = manager;
 
-	private Stack<VariableTable> LocalVariables { get; } = [];
-	private VariableTable CurrentScope => LocalVariables.Peek();
+	private Stack<LocalVariableTable> Tables { get; } = [];
+	private LocalVariableTable CurrentScope => Tables.Peek();
 
 	public void PushScope()
 	{
-		LocalVariables.Push(new(_manager));
+		Tables.Push(new(_manager));
 	}
 
 	public void PopScope()
 	{
-		LocalVariables.Pop();
+		Tables.Pop();
 	}
 
 	public void EnsureNoScope()
 	{
-		if (LocalVariables.Count != 0)
-		{
-			throw new InvalidOperationException($"Scope was {LocalVariables.Count}");
-		}
+		if (Tables.Count != 0)
+			throw new InvalidOperationException($"Scope was {Tables.Count}");
 	}
 
-	public void AddLocal(VariableSymbol variable)
+	public void AddLocal(LocalVariableSymbol variable)
 	{
-		_manager.EnsureSymbolNameIsUnique(variable.Ident);
+		_manager.EnsureSymbolNameIsUnique(variable.Ident.AsGlobal());
 		CurrentScope.Add(variable);
 	}
 
@@ -71,21 +69,19 @@ public sealed class LocalVariablesManager(SymbolTableManager manager)
 	{
 		var ident = IdentHelper.ForLocalVariable(name);
 		// foreach over a stack enumerates from top to bottom
-		foreach (var table in LocalVariables)
+		foreach (var table in Tables)
 		{
 			if (table.Contains(ident))
-			{
 				return true;
-			}
 		}
 
 		return false;
 	}
 
-	public bool TryGet(string name, [NotNullWhen(true)] out VariableSymbol? symbol)
+	public bool TryGet(string name, [NotNullWhen(true)] out LocalVariableSymbol? symbol)
 	{
 		var ident = IdentHelper.ForLocalVariable(name);
-		foreach (var table in LocalVariables)
+		foreach (var table in Tables)
 		{
 			if (table.TryGet(ident, out symbol))
 			{

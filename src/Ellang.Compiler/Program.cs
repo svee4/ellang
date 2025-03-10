@@ -1,22 +1,16 @@
 using Ellang.Compiler;
-using Ellang.Compiler.Compilation;
-using Ellang.Compiler.Infra;
-using Ellang.Compiler.Lexer;
-using Ellang.Compiler.Parser;
-using Microsoft.Extensions.Logging;
-using System.Text.Json;
 
 const string Input = """
-func main(argc: int, argv: &&char): int {
+func main(argc: int, argv: &&byte): int {
 	
 }
 
 func sample(value: &int, list: Core::List<int>): void {
 	var another_ref: &int = value;
 	var deref: int = *value;
-	var x: int = deref 3;
+	var x: int = deref + 3;
 
-	var y: int = list[3];
+	var y: int = list.At(3);
 
 	var eq1: bool = x == deref;
 	var eq2: bool = x < deref;
@@ -24,7 +18,7 @@ func sample(value: &int, list: Core::List<int>): void {
 
 	var bitwised: int = x & deref;
 
-	_ = random_method(x, 3);
+	_ = sample(x, 3);
 }
 
 struct Test {
