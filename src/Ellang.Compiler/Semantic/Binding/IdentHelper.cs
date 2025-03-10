@@ -1,41 +1,40 @@
-using Ellang.Compiler.Parser.Nodes;
-using Ellang.Compiler.Semantic;
+using Ellang.Compiler.Parsing.Nodes;
 
 namespace Ellang.Compiler.Semantic.Binding;
 
 
-public sealed class IdentHelper(Binder analyzer)
+public sealed class IdentHelper(SyntaxTreeBinder analyzer)
 {
-	private readonly Binder _analyzer = analyzer;
+	private readonly SyntaxTreeBinder _analyzer = analyzer;
 
 	private string CurComp => _analyzer.Compilation.ModuleName;
 
 	private static string FormatArity(string name, int arity) =>
 		arity > 0 ? $"{name}`{arity}" : name;
 
-	public static SymbolIdent ForLocalVariable(string localName) =>
-		SymbolIdent.From(localName, "");
+	public static LocalSymbolIdent ForLocalVariable(string localName) =>
+		new LocalSymbolIdent(localName);
 
-	public SymbolIdent ForCurComp(string symbol) =>
-		SymbolIdent.From(symbol, CurComp);
+	public GlobalSymbolIdent ForCurComp(string symbol) =>
+		GlobalSymbolIdent.From(symbol, CurComp);
 
-	public static SymbolIdent ForStruct(StructDeclarationStatement st, string module) =>
-		SymbolIdent.From(FormatArity(st.Name.Value, st.TypeParameters.Count), module);
+	public static GlobalSymbolIdent ForStruct(StructDeclaration st, string module) =>
+		GlobalSymbolIdent.From(FormatArity(st.Name.Value, st.TypeParameters.Count), module);
 
-	public SymbolIdent ForStructCurComp(StructDeclarationStatement st) =>
+	public GlobalSymbolIdent ForStructCurComp(StructDeclaration st) =>
 		ForStruct(st, CurComp);
 
-	public static SymbolIdent ForNamedFunc(FunctionDeclarationStatement st, string module) =>
-		SymbolIdent.From(FormatArity(st.Name.Value, st.TypeParameters.Count), module);
+	public static GlobalSymbolIdent ForNamedFunc(FunctionDeclaration st, string module) =>
+		GlobalSymbolIdent.From(FormatArity(st.Name.Value, st.TypeParameters.Count), module);
 
-	public SymbolIdent ForNamedFuncCurComp(FunctionDeclarationStatement st) =>
+	public GlobalSymbolIdent ForNamedFuncCurComp(FunctionDeclaration st) =>
 		ForNamedFunc(st, CurComp);
 
-	public SymbolIdent ForAnonFunc() => throw new NotImplementedException();
+	public GlobalSymbolIdent ForAnonFunc() => throw new NotImplementedException();
 
-	public SymbolIdent ForTypeRef(TypeRef type) =>
-		SymbolIdent.From(FormatArity(type.Identifier.Value, type.Generics.Count), type.Identifier.Module ?? CurComp);
+	public GlobalSymbolIdent ForTypeRef(TypeRef type) =>
+		GlobalSymbolIdent.From(FormatArity(type.Identifier.Value, type.Generics.Count), type.Identifier.Module ?? CurComp);
 
-	public SymbolIdent FromIdentifier(Identifier ident) =>
-		ident.Module is { } mod ? SymbolIdent.From(ident.Value, mod) : ForCurComp(ident.Value);
+	public GlobalSymbolIdent FromIdentifier(Identifier ident) =>
+		ident.Module is { } mod ? GlobalSymbolIdent.From(ident.Value, mod) : ForCurComp(ident.Value);
 }

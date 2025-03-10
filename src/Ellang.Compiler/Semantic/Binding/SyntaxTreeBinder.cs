@@ -1,24 +1,24 @@
+using Ellang.Compiler.Infra;
+using Ellang.Compiler.Parsing;
+using Ellang.Compiler.Parsing.Nodes;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
-using System.Security.Cryptography.X509Certificates;
-using Ellang.Compiler.Parser;
-using Ellang.Compiler.Parser.Nodes;
-using Microsoft.Extensions.Logging;
 
 namespace Ellang.Compiler.Semantic.Binding;
 
-public sealed class Binder
+public sealed class SyntaxTreeBinder
 {
-	public ILogger<Binder> Logger { get; }
-	public AFcukingCompilation Compilation { get; }
-	public SymbolTableManager SymbolManager { get; } = new();
+	public ILogger<SyntaxTreeBinder> Logger { get; }
+	public Compilation Compilation { get; }
+	public SymbolTableManager SymbolManager { get; }
 	public IdentHelper IdentHelper { get; }
 
-	public Binder(AFcukingCompilation compilation, ILogger<Binder> logger)
+	public SyntaxTreeBinder(Compilation compilation, ILogger<SyntaxTreeBinder> logger)
 	{
 		Compilation = compilation;
 		Logger = logger;
+		SymbolManager = new SymbolTableManager(this);
 		IdentHelper = new IdentHelper(this);
 	}
 
@@ -36,61 +36,60 @@ public sealed class Binder
 		{
 			switch (statement)
 			{
-				case FunctionDeclarationStatement st:
+				case FunctionDeclaration st:
 				{
-					CreateFunctionExpressionSymbols(st);
+					CreateFunctionDeclarationSymbols(st);
 					break;
 				}
-				case StructDeclarationStatement st:
+				case StructDeclaration st:
 				{
 					CreateStructDeclarationSymbols(st);
 					break;
 				}
-				default: throw new InvalidOperationException($"Unhandled statement {statement.GetType()}");
+				default: throw new UnreachableException($"Unhandled statement {statement?.GetType()}");
 			}
 		}
 	}
 
-	private void CreateFunctionExpressionSymbols(FunctionDeclarationStatement st)
+	private void CreateFunctionDeclarationSymbols(FunctionDeclaration st)
 	{
-		using var scope = Logger.BeginScope(nameof(CreateFunctionExpressionSymbols));
-
-		var name = st.Name.Value;
-		var syntax = st;
+		using var scope = Logger.BeginScope(nameof(CreateFunctionDeclarationSymbols));
 
 		var returnType = BindTypeSyntaxToTypeSymbolOrGetUnbound(st.ReturnType);
 
 		var parameters = st.Parameters
 			.Select(p => new FunctionParameterSymbol(
 				new LocalSymbolIdent(p.Name.Value),
-				BindTypeSyntaxToTypeSymbolOrGetUnbound(p.Type)))
-			.ToList();
+				BindTypeSyntaxToTypeSymbolOrGetUnbound(p.Type),
+				VariableModifiers.None))
+			.ToEquatableArray();
 
-		var symbol = new NamedFunctionSymbol(IdentHelper.ForNamedFuncCurComp(st), returnType, [], parameters, [], st);
+		var fbase = new FunctionSymbolBase(returnType, [], parameters, []);
+		var symbol = new GlobalFunctionSymbol(IdentHelper.ForNamedFuncCurComp(st), fbase, st);
 
 		Logger.LogDebug("Created function {Name}({Parameters}): {ReturnType}",
 			symbol.Ident,
-			string.Join(", ", parameters.Select(p => $"{p.Ident}: {p.Type.Ident}")),
-			returnType.Ident);
+			string.Join(", ", parameters.Select(p => $"{p.Ident}: {p.Type}")),
+			returnType);
 
 		SymbolManager.GlobalFunctionTable.Add(symbol);
 	}
 
-	private void CreateStructDeclarationSymbols(StructDeclarationStatement st)
+	private void CreateStructDeclarationSymbols(StructDeclaration st)
 	{
 		using var scope = Logger.BeginScope(nameof(CreateStructDeclarationSymbols));
 
+		var symbol = new StructSymbol(IdentHelper.ForStructCurComp(st), [], [], [], st);
+
 		var fields = st.Fields
 			.Select(f => new StructFieldSymbol(
-				new LocalSymbolIdent(f.Name.Value),
+				new MemberSymbolIdent(f.Name.Value, symbol.Ident),
 				BindTypeSyntaxToTypeSymbolOrGetUnbound(f.Type)))
 			.ToList();
 
-		var symbol = new StructSymbol(IdentHelper.ForStructCurComp(st), [], fields, [], st);
+		symbol = symbol with { Fields = fields };
 
-		Logger.LogDebug("Created struct {Name} {{ {Fields} }} ",
-			symbol.Ident,
-			string.Join("; ", fields.Select(f => $"{f.Ident}: {f.Type.Ident}")));
+		Logger.LogDebug("Created struct {Name} {{ {Fields} }}", symbol.Ident, string.Join(", ", fields));
 
 		SymbolManager.GlobalStructTable.Add(symbol);
 	}
@@ -103,12 +102,12 @@ public sealed class Binder
 		{
 			switch (statement)
 			{
-				case FunctionDeclarationStatement st:
+				case FunctionDeclaration st:
 				{
 					BindFunctionStatementSymbols(st);
 					break;
 				}
-				case StructDeclarationStatement st:
+				case StructDeclaration st:
 				{
 					BindStructDeclarationSymbols(st);
 					break;
@@ -118,21 +117,24 @@ public sealed class Binder
 		}
 	}
 
-	private void BindFunctionStatementSymbols(FunctionDeclarationStatement func)
+	private void BindFunctionStatementSymbols(FunctionDeclaration func)
 	{
 		var funcIdent = IdentHelper.ForNamedFuncCurComp(func);
 
-		using var scope = Logger.BeginScope(nameof(BindFunctionStatementSymbols) + " - {FunctionIdentifier}", funcIdent);
+		using var scope = Logger.BeginScope(nameof(BindFunctionStatementSymbols) + " [{FunctionIdentifier}]", funcIdent);
 
-		SymbolManager.GlobalFunctionTable.Update(
-			funcIdent,
+		// bind parameter symbols and return type
+		SymbolManager.GlobalFunctionTable.Update(funcIdent,
 			prev => prev with
 			{
-				Parameters = prev.Parameters.Select(p => p with { Type = BindUnboundTypeSymbol(p.Type) }).ToList(),
-				ReturnType = BindUnboundTypeSymbol(prev.ReturnType),
+				Function = prev.Function with
+				{
+					Parameters = prev.Parameters.Select(p => p with { Type = BindUnboundTypeSymbol(p.Type) }).ToList(),
+					ReturnType = BindUnboundTypeSymbol(prev.ReturnType),
+				}
 			});
 
-		var parser = new OperationParser(this);
+		var parser = new OperationBinder(this);
 		List<IOperation> operations = [];
 
 		SymbolManager.LocalVariablesManager.EnsureNoScope();
@@ -145,7 +147,7 @@ public sealed class Binder
 			{
 				var ident = parameter.Ident;
 				var type = parameter.Type;
-				SymbolManager.LocalVariablesManager.AddLocal(new LocalVariableSymbol(ident, type));
+				SymbolManager.LocalVariablesManager.AddLocal(new LocalVariableSymbol(ident, type, VariableModifiers.None));
 			}
 		}
 
@@ -179,7 +181,7 @@ public sealed class Binder
 					case ReturnExpression ret:
 					{
 						op = ret.Value is { } v
-							? new ReturnOperation(parser.ParseOperation(v)) 
+							? new ReturnOperation(parser.ParseOperation(v))
 							: new ReturnOperation(null);
 						break;
 					}
@@ -188,7 +190,7 @@ public sealed class Binder
 					default: throw new InvalidOperationException($"Unexpected statement {statement}");
 				}
 
-				Logger.LogDebug("Added operation {Operation}", op);
+				Logger.LogTrace("Added operation {Operation}", op);
 				operations.Add(op);
 			}
 		}
@@ -196,7 +198,10 @@ public sealed class Binder
 		SymbolManager.GlobalFunctionTable.Update(IdentHelper.ForNamedFuncCurComp(func),
 			prev => prev with
 			{
-				Operations = operations,
+				Function = prev.Function with
+				{
+					Operations = operations,
+				}
 			});
 
 		SymbolManager.LocalVariablesManager.PopScope();
@@ -214,17 +219,23 @@ public sealed class Binder
 	{
 		var ident = IdentHelper.ForLocalVariable(decl.Name.Value);
 		var type = BindUnboundTypeSymbol(BindTypeSyntaxToTypeSymbolOrGetUnbound(decl.Type));
-		var sym = new GlobalVariableSymbol(ident, type);
 
+		var mods = decl.Kind switch
+		{
+			VariableKind.Let => VariableModifiers.None,
+			VariableKind.Mut => VariableModifiers.Mutable,
+			_ => throw new UnreachableException()
+		};
+
+		var sym = new LocalVariableSymbol(ident, type, mods);
 		var init = initializerParser(decl.Initializer);
 
-		var local = new LocalVariableSymbol(new LocalSymbolIdent(ident.Name), type);
-		SymbolManager.LocalVariablesManager.AddLocal(local);
+		SymbolManager.LocalVariablesManager.AddLocal(sym);
 
 		return new VariableDeclarationOperation(sym, init);
 	}
 
-	private void BindStructDeclarationSymbols(StructDeclarationStatement declaration)
+	private void BindStructDeclarationSymbols(StructDeclaration declaration)
 	{
 		using var scope = Logger.BeginScope(nameof(BindStructDeclarationSymbols));
 
@@ -237,7 +248,9 @@ public sealed class Binder
 			foreach (var field in declaration.Fields)
 			{
 				var typeReferenceSymbol = BindUnboundTypeSymbol(BindTypeSyntaxToTypeSymbolOrGetUnbound(field.Type));
-				var fieldSymbol = new StructFieldSymbol(new LocalSymbolIdent(field.Name.Value), typeReferenceSymbol);
+				var fieldSymbol = new StructFieldSymbol(
+					new MemberSymbolIdent(field.Name.Value, structIdent),
+					typeReferenceSymbol);
 				fields.Add(fieldSymbol);
 			}
 		}
@@ -254,17 +267,17 @@ public sealed class Binder
 		using var scope = Logger.BeginScope(nameof(BindUnboundTypeSymbol));
 		return RecursivelyBindSymbol(possiblyUnboundSymbol, this);
 
-		static TypeReferenceSymbol RecursivelyBindSymbol(TypeReferenceSymbol symbol, Binder binder)
+		static TypeReferenceSymbol RecursivelyBindSymbol(TypeReferenceSymbol symbol, SyntaxTreeBinder binder)
 		{
-			using var scope = binder.Logger.BeginScope("[{SymbolIdentifier}]", symbol.Ident);
+			using var scope = binder.Logger.BeginScope("[{TypeSymbol}]", symbol);
 
 			switch (symbol)
 			{
-				case UnboundTypeReferenceSymbol:
+				case UnboundTypeReferenceSymbol unbound:
 				{
-					return binder.SymbolManager.GlobalStructTable.TryGet(symbol.Ident, out var structSymbol)
+					return binder.SymbolManager.GlobalStructTable.TryGet(unbound.Ident, out var structSymbol)
 						? new StructTypeReferenceSymbol(structSymbol)
-						: throw new CouldNotBindTypeException(symbol.Ident);
+						: throw new CouldNotBindTypeException(unbound.Ident);
 				}
 				case StructTypeReferenceSymbol sref:
 				{
@@ -285,7 +298,14 @@ public sealed class Binder
 				case PointerTypeReferenceSymbol ptr:
 				{
 					var underlying = RecursivelyBindSymbol(ptr.UnderlyingType, binder);
-					return new PointerTypeReferenceSymbol(underlying, ptr.PointerCount);
+					return new PointerTypeReferenceSymbol(underlying);
+				}
+				case FunctionTypeReferenceSymbol f:
+				{
+					var parameters = f.Parameters.Select(p => RecursivelyBindSymbol(p, binder));
+					var returnType = RecursivelyBindSymbol(f.ReturnType, binder);
+					// TODO: bind type parameter constraints
+					return new FunctionTypeReferenceSymbol(f.TypeParameters, parameters.ToEquatableArray(), returnType);
 				}
 
 				case null: throw new ArgumentNullException(nameof(symbol));
@@ -304,7 +324,7 @@ public sealed class Binder
 			_ => MakeTypeSymbol(type, this),
 		};
 
-		static TypeReferenceSymbol MakeTypeSymbol(TypeRef type, Binder binder)
+		static TypeReferenceSymbol MakeTypeSymbol(TypeRef type, SyntaxTreeBinder binder)
 		{
 			TypeReferenceSymbol baseSymbol;
 
@@ -320,16 +340,16 @@ public sealed class Binder
 				baseSymbol = new GenericTypeReferenceSymbol(baseSymbol, generics);
 			}
 
-			if (type.PointerCount > 0)
+			for (var i = 0; i < type.PointerCount; i++)
 			{
-				baseSymbol = new PointerTypeReferenceSymbol(baseSymbol, type.PointerCount);
+				baseSymbol = new PointerTypeReferenceSymbol(baseSymbol);
 			}
 
 			return baseSymbol;
 		}
 	}
 
-	[SuppressMessage("Design", "CA1032:Implement standard exception constructors", 
+	[SuppressMessage("Design", "CA1032:Implement standard exception constructors",
 		Justification = "I dont want to")]
 	public abstract class AnalyzerException(string message) : Exception(message);
 
@@ -339,6 +359,6 @@ public sealed class Binder
 	{
 		public string TypeName { get; } = typeName;
 
-		public CouldNotBindTypeException(SymbolIdent ident) : this(ident.ToString()) { }
+		public CouldNotBindTypeException(GlobalSymbolIdent ident) : this(ident.ToString()) { }
 	}
 }

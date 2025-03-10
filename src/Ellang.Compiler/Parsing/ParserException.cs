@@ -1,7 +1,6 @@
+using Ellang.Compiler.Lexing;
 
-using Ellang.Compiler.Lexer;
-
-namespace Ellang.Compiler.Parser;
+namespace Ellang.Compiler.Parsing;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1032:Implement standard exception constructors", Justification = "")]
 public sealed class ParserException : Exception

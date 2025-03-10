@@ -1,4 +1,4 @@
-using Ellang.Compiler.Parser.Nodes;
+using Ellang.Compiler.Parsing.Nodes;
 using System.Diagnostics;
 
 namespace Ellang.Compiler.Infra;
@@ -9,18 +9,18 @@ public static class Visitors
 	{
 		public required Func<FunctionCallExpression, ExpressionVisitor<T>, T> FunctionCallExpressionVisitor { get; init; }
 		public required Func<IndexerCallExpression, ExpressionVisitor<T>, T> IndexerCallExpressionVisitor { get; init; }
-		
+
 		public required Func<VariableDeclarationStatement, ExpressionVisitor<T>, T> VariableDeclarationStatementVisitor { get; init; }
 		public required Func<AssignmentExpression, ExpressionVisitor<T>, T> AssignmentExpressionVisitor { get; init; }
 		public required Func<DiscardExpression, ExpressionVisitor<T>, T> DiscardExpressionVisitor { get; init; }
 
 		public required Func<MemberAccessExpression, ExpressionVisitor<T>, T> MemberAccessExpressionVisitor { get; init; }
 		public required Func<IdentifierExpression, ExpressionVisitor<T>, T> IdentifierExpressionVisitor { get; init; }
-		
-		public required Func<BlockExpression, ExpressionVisitor<T>, T> BlockExpressionVisitor {get; init; }
-		public required Func<ReturnExpression, ExpressionVisitor<T>, T> ReturnExpressionVisitor {get; init; }
-		public required Func<YieldExpression, ExpressionVisitor<T>, T> YieldExpressionVisitor {get; init; }
-		
+
+		public required Func<BlockExpression, ExpressionVisitor<T>, T> BlockExpressionVisitor { get; init; }
+		public required Func<ReturnExpression, ExpressionVisitor<T>, T> ReturnExpressionVisitor { get; init; }
+		public required Func<YieldExpression, ExpressionVisitor<T>, T> YieldExpressionVisitor { get; init; }
+
 		public required Func<StringLiteralExpression, ExpressionVisitor<T>, T> StringLiteralExpressionVisitor { get; init; }
 		public required Func<IntLiteralExpression, ExpressionVisitor<T>, T> IntLiteralExpressionVisitor { get; init; }
 

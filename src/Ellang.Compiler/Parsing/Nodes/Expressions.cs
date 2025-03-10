@@ -1,12 +1,15 @@
 using Ellang.Compiler.Infra;
 
-namespace Ellang.Compiler.Parser.Nodes;
+namespace Ellang.Compiler.Parsing.Nodes;
 
 public interface IExpression;
 
 public interface IExpressionStatement : IExpression, IStatement;
 
-public sealed record FunctionCallExpression(IExpression FunctionExpression, EquatableList<FunctionArgument> Arguments) : IExpressionStatement;
+public sealed record FunctionExpression(TypeRef ReturnType, EquatableArray<TypeParameter> TypeParameters,
+	EquatableArray<FunctionParameter> Parameters, EquatableArray<IExpressionStatement> Statements) : IExpression;
+
+public sealed record FunctionCallExpression(IExpression FunctionExpression, EquatableArray<FunctionArgument> Arguments) : IExpressionStatement;
 public sealed record IndexerCallExpression(IExpression Source, IExpression Indexer) : IExpression;
 public sealed record FunctionArgument(IExpression Value);
 

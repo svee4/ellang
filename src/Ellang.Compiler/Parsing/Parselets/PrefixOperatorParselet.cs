@@ -1,8 +1,7 @@
-using Ellang.Compiler.Lexer;
-using Ellang.Compiler.Parser.Nodes;
-using System.Diagnostics;
+using Ellang.Compiler.Lexing;
+using Ellang.Compiler.Parsing.Nodes;
 
-namespace Ellang.Compiler.Parser.Parselets;
+namespace Ellang.Compiler.Parsing.Parselets;
 
 // same as BinaryOperatorParselet, this parselet is used for all prefixed unary operators
 // as listed in the switch

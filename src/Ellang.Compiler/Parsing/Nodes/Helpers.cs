@@ -1,6 +1,6 @@
-namespace Ellang.Compiler.Parser.Nodes;
+namespace Ellang.Compiler.Parsing.Nodes;
 
-public interface ITopLevelStatement;
+public interface ITopLevelStatement : IStatement;
 
 public sealed record Identifier(string Value, string? Module)
 {
@@ -22,15 +22,3 @@ public sealed record Identifier(string Value, string? Module)
 /// Non-keyworded types will have <c>OriginalIdentifier</c> set to null
 /// </summary>
 public record TypeRef(Identifier Identifier, int PointerCount, List<TypeRef> Generics, string? OriginalIdentifier);
-
-[Obsolete("Use EquatableList")]
-public sealed record NodeList<T>(List<T> Nodes)
-{
-	public override string ToString() => string.Join(", ", Nodes);
-}
-
-public static class NodeList
-{
-	[Obsolete("Use EquatableList")]
-	public static NodeList<T> From<T>(IEnumerable<T> source) => new NodeList<T>(source.ToList());
-}

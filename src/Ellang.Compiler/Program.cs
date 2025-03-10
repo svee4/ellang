@@ -5,23 +5,27 @@ func main(argc: int, argv: &&byte): int {
 	
 }
 
+func M<T>(val: T): T { return val; }
+
 func sample(value: &int, list: Core::List<int>): int {
-	var another_ref: &int = value;
-	var deref: int = *value;
-	var x: int = deref + 3;
+	let another_ref: &int = value;
+	let deref: int = *value;
+	let x: int = deref + 3;
 
-	var y: int = list.At(3);
+	let y: int = list.At(3);
 
-	var eq1: bool = x == deref;
-	var eq2: bool = x < deref;
-	var eq3: bool = eq1 && eq2;
+	let eq1: bool = x == deref;
+	let eq2: bool = x < deref;
+	mut eq3: bool = eq1 && eq2;
 
-	var bitwised: int = x & deref;
+	let bitwised: int = x & deref;
 
 	_ = sample(x, 3);
 
-	var ret: int = { 
-		var temp: int = 3;
+	sample(x, 4);
+
+	mut ret: int = { 
+		let temp: int = 3;
 		yield temp;
 	};
 
@@ -33,4 +37,4 @@ struct Test {
 }
 """;
 
-new AFcukingCompilation("TestCompilation").Compile(Input);
+new Compilation("TestCompilation").Compile(Input);

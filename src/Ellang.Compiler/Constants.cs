@@ -21,4 +21,13 @@ public static class Constants
 		("void", "Void"),
 		("string", "String")
 	];
+
+	public static string LocalSymbolIdentModuleName => "local";
+	public static string CompilerInternalModuleName => "_";
+
+	public static IReadOnlyList<string> CompilerReservedModuleNames =>
+	[
+		LocalSymbolIdentModuleName,
+		CompilerInternalModuleName
+	];
 }

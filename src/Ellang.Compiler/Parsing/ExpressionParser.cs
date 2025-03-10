@@ -1,10 +1,9 @@
-using Ellang.Compiler.Lexer;
-using Ellang.Compiler.Parser.Nodes;
-using Ellang.Compiler.Parser.Parselets;
+using Ellang.Compiler.Lexing;
+using Ellang.Compiler.Parsing.Nodes;
+using Ellang.Compiler.Parsing.Parselets;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 
-namespace Ellang.Compiler.Parser;
+namespace Ellang.Compiler.Parsing;
 
 public sealed class ExpressionParser(Parser parser)
 {
@@ -51,9 +50,14 @@ public sealed class ExpressionParser(Parser parser)
 		Star =>			new PrefixOperatorParselet<Star>(),
 		OpenParen =>	new GroupingParselet(),
 		OpenBrace =>	new BlockExpressionParselet(),
+		FuncKeyword =>	new FunctionExpressionParselet(),
+		YieldKeyword => new YieldExpressionParselet(),
+		ReturnKeyword =>	new ReturnExpressionParselet(),
 		StringLiteral =>	new LiteralParselet<StringLiteral>(),
 		NumericLiteral =>	new LiteralParselet<NumericLiteral>(),
 		IdentifierLiteral =>	new IdentifierParselet(),
+		UnderscoreKeyword =>	new DiscardExpressionParselet(),
+		LetKeyword or MutKeyword =>		new VariableDeclarationParselet(),
 		_ => null
 	};
 

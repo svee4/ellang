@@ -1,7 +1,7 @@
-using Ellang.Compiler.Lexer;
-using Ellang.Compiler.Parser.Nodes;
+using Ellang.Compiler.Lexing;
+using Ellang.Compiler.Parsing.Nodes;
 
-namespace Ellang.Compiler.Parser.Parselets;
+namespace Ellang.Compiler.Parsing.Parselets;
 
 // a function does not need to be called with its name:
 // var x: int = (func _(): int { return 3; })(); should be valid (in the future when function expression are implemented),
@@ -26,6 +26,8 @@ public sealed class FunctionCallParselet : ParseletBase, IInfixParselet
 		// single trailing commas in parameter list are allowed
 
 		_ = parser.Eat<CloseParen>();
+		_ = parser.EatIf<SemiColon>();
+
 		return new FunctionCallExpression(left, arguments);
 	}
 }

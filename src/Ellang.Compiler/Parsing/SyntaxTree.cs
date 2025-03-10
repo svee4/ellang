@@ -1,9 +1,8 @@
-using Ellang.Compiler.Lexer;
-using Ellang.Compiler.Parser.Nodes;
+using Ellang.Compiler.Parsing.Nodes;
 using System.Globalization;
 using System.Text;
 
-namespace Ellang.Compiler.Parser;
+namespace Ellang.Compiler.Parsing;
 
 public sealed class SyntaxTree
 {
@@ -22,7 +21,7 @@ public sealed class SyntaxTree
 
 			switch (statement)
 			{
-				case FunctionDeclarationStatement func:
+				case FunctionDeclaration func:
 				{
 					w.Append("func ");
 					w.Append(func.Name.Value);
@@ -93,6 +92,12 @@ public sealed class SyntaxTree
 								w.Append(";");
 								break;
 							}
+							case FunctionCallExpression call:
+							{
+								w.Append(ExpressionToString(call.FunctionExpression));
+								w.Append($"({string.Join(", ", call.Arguments.Select(arg => ExpressionToString(arg.Value)))})");
+								break;
+							}
 							case var idk: throw new NotSupportedException(idk.ToString());
 						}
 					}
@@ -103,7 +108,7 @@ public sealed class SyntaxTree
 
 					break;
 				}
-				case StructDeclarationStatement s:
+				case StructDeclaration s:
 				{
 					w.Append("struct ");
 					w.Append(s.Name.Value);
@@ -248,7 +253,7 @@ public sealed class SyntaxTree
 			return this;
 		}
 
-		public IDisposable WithIndent()
+		public Unindenter WithIndent()
 		{
 			_ = AddIndent();
 			return new Unindenter(this);

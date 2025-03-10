@@ -2,16 +2,18 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Ellang.Compiler.Semantic;
 
-public abstract class SymbolTable<T>(SymbolTableManager manager) where T : INamedSymbol
+public abstract class SymbolTable<T, TIdent>(SymbolTableManager manager)
+	where T : INamedSymbol
+	where TIdent : ISymbolIdent
 {
 	protected SymbolTableManager Manager { get; } = manager;
-	protected Dictionary<SymbolIdent, T> SymbolMap { get; } = [];
+	protected Dictionary<TIdent, T> SymbolMap { get; } = [];
 
 	public IReadOnlyList<T> Symbols => SymbolMap.Values.ToArray();
 
-	public bool Contains(SymbolIdent name) => TryGet(name, out _);
+	public bool Contains(TIdent name) => TryGet(name, out _);
 
-	public bool TryGet(SymbolIdent ident, [NotNullWhen(true)] out T? symbol)
+	public bool TryGet(TIdent ident, [NotNullWhen(true)] out T? symbol)
 	{
 		if (SymbolMap.TryGetValue(ident, out var sym))
 		{
@@ -26,20 +28,20 @@ public abstract class SymbolTable<T>(SymbolTableManager manager) where T : IName
 	public void Add(T symbol)
 	{
 		Manager.EnsureSymbolNameIsUnique(symbol.Ident);
-		SymbolMap.Add(symbol.Ident, symbol);
+		SymbolMap.Add((TIdent)symbol.Ident, symbol);
 	}
 
-	public T Get(SymbolIdent ident) =>
+	public T Get(TIdent ident) =>
 		SymbolMap.TryGetValue(ident, out var value)
 			? value
 			: throw new InvalidOperationException($"Could not find symbol {ident}");
 
-	public void Update(SymbolIdent ident, Func<T, T> updater) =>
+	public void Update(TIdent ident, Func<T, T> updater) =>
 		SymbolMap[ident] = updater(SymbolMap[ident]);
 }
 
-public sealed class GlobalVariableTable(SymbolTableManager manager) : SymbolTable<GlobalVariableSymbol>(manager);
-public sealed class LocalVariableTable(SymbolTableManager manager) : SymbolTable<LocalVariableSymbol>(manager);
-public sealed class StructTable(SymbolTableManager manager) : SymbolTable<StructSymbol>(manager);
-public sealed class TraitTable(SymbolTableManager manager) : SymbolTable<TraitSymbol>(manager);
-public sealed class FunctionTable(SymbolTableManager manager) : SymbolTable<NamedFunctionSymbol>(manager);
+public sealed class LocalVariableTable(SymbolTableManager manager) : SymbolTable<LocalVariableSymbol, LocalSymbolIdent>(manager);
+public sealed class GlobalVariableTable(SymbolTableManager manager) : SymbolTable<GlobalVariableSymbol, GlobalSymbolIdent>(manager);
+public sealed class StructTable(SymbolTableManager manager) : SymbolTable<StructSymbol, GlobalSymbolIdent>(manager);
+public sealed class TraitTable(SymbolTableManager manager) : SymbolTable<TraitSymbol, GlobalSymbolIdent>(manager);
+public sealed class FunctionTable(SymbolTableManager manager) : SymbolTable<GlobalFunctionSymbol, GlobalSymbolIdent>(manager);

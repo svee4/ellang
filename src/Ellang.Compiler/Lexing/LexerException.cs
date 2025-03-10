@@ -1,4 +1,4 @@
-namespace Ellang.Compiler.Lexer;
+namespace Ellang.Compiler.Lexing;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Design", "CA1032:Implement standard exception constructors", Justification = "")]
 public sealed class LexerException : Exception

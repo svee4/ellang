@@ -1,20 +1,39 @@
 using Microsoft.Extensions.Logging;
+using System.Collections.Frozen;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 
-namespace Ellang.Compiler.Lexer;
+namespace Ellang.Compiler.Lexing;
 
-public sealed class Lexer(ILogger<Lexer> logger)
+public sealed class Lexer
 {
 	private const string PosLog = "{Line}:{Column}:";
 
-	private readonly ILogger<Lexer> _logger = logger;
+	private readonly ILogger<Lexer> _logger;
 
 	private string _source = null!;
 	private int _index;
-	private int _line;
-	private int _column;
+	private int _line = 1;
+	private int _column = 1;
+
+	private readonly FrozenDictionary<string, Func<Keyword>> _keywords;
+
+	public Lexer(ILogger<Lexer> logger)
+	{
+		_logger = logger;
+		_keywords = typeof(Lexer).Assembly.GetTypes()
+			.Where(type => !type.IsAbstract && type.IsAssignableTo(typeof(Keyword)))
+			.Select(Activator.CreateInstance)
+			.Cast<Keyword>()
+			.ToDictionary(
+				kw => kw.Value,
+				kw => typeof(Lexer)
+					.GetMethod("Token", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+					.MakeGenericMethod(kw.GetType()).CreateDelegate<Func<Keyword>>(this))
+			.ToFrozenDictionary();
+	}
 
 	private ReadOnlySpan<char> Remaining => _source.AsSpan()[_index..];
 
@@ -87,29 +106,8 @@ public sealed class Lexer(ILogger<Lexer> logger)
 
 	private void ThrowLexerException(string message) => throw new LexerException(_line, _column, message);
 
-	private Keyword? GetKeyword(string keyword) => keyword switch
-	{
-		"return" => Token<ReturnKeyword>(),
-		"yield" => Token<YieldKeyword>(),
-		"struct" => Token<StructKeyword>(),
-		"impl" => Token<ImplKeyword>(),
-		"func" => Token<FuncKeyword>(),
-		"var" => Token<VarKeyword>(),
-
-		"bool" => Token<BoolKeyword>(),
-		"byte" => Token<ByteKeyword>(),
-		"sbyte" => Token<SByteKeyword>(),
-		"short" => Token<ShortKeyword>(),
-		"ushort" => Token<UShortKeyword>(),
-		"int" => Token<IntKeyword>(),
-		"uint" => Token<UIntKeyword>(),
-		"long" => Token<LongKeyword>(),
-		"ulong" => Token<ULongKeyword>(),
-		"void" => Token<VoidKeyword>(),
-		"string" => Token<StringKeyword>(),
-		"never" => Token<NeverKeyword>(),
-		_ => null
-	};
+	private Keyword? GetKeyword(string keyword) =>
+		_keywords.TryGetValue(keyword, out var f) ? f() : null;
 
 	public List<LexerToken> Parse(string source)
 	{
@@ -285,67 +283,3 @@ public sealed class Lexer(ILogger<Lexer> logger)
 		return instance;
 	}
 }
-
-public abstract record LexerToken
-{
-	public required int Line { get; init; }
-	public required int Column { get; init; }
-}
-
-public sealed record EndOfFile : LexerToken;
-
-public abstract record Literal : LexerToken;
-public sealed record StringLiteral(string Value) : Literal;
-public sealed record NumericLiteral(int Value) : Literal;
-public sealed record IdentifierLiteral(string Value) : Literal;
-
-public abstract record Keyword : LexerToken;
-public sealed record ReturnKeyword : Keyword;
-public sealed record YieldKeyword : Keyword;
-public sealed record StructKeyword : Keyword;
-public sealed record ImplKeyword : Keyword;
-public sealed record FuncKeyword : Keyword;
-public sealed record VarKeyword : Keyword;
-public sealed record UnderscoreKeyword : Keyword;
-public sealed record NeverKeyword : Keyword;
-
-public abstract record TypeKeyword(string Keyword, string CoreLibType) : Keyword;
-public sealed record BoolKeyword() : TypeKeyword("bool", "Boolean");
-public sealed record ByteKeyword() : TypeKeyword("byte", "Int8");
-public sealed record SByteKeyword() : TypeKeyword("sbyte", "Uint8");
-public sealed record ShortKeyword() : TypeKeyword("short", "Int16");
-public sealed record UShortKeyword() : TypeKeyword("ushort", "UInt16");
-public sealed record IntKeyword() : TypeKeyword("int", "Int32");
-public sealed record UIntKeyword() : TypeKeyword("uint", "UInt32");
-public sealed record LongKeyword() : TypeKeyword("long", "Int64");
-public sealed record ULongKeyword() : TypeKeyword("ulong", "UInt64");
-public sealed record VoidKeyword() : TypeKeyword("void", "Void");
-public sealed record StringKeyword() : TypeKeyword("string", "String");
-
-public sealed record OpenParen : LexerToken;
-public sealed record CloseParen : LexerToken;
-public sealed record OpenBracket : LexerToken;
-public sealed record CloseBracket : LexerToken;
-public sealed record OpenBrace : LexerToken;
-public sealed record CloseBrace : LexerToken;
-public sealed record OpenAngleBracket : LexerToken;
-public sealed record CloseAngleBracket : LexerToken;
-
-public sealed record Comma : LexerToken;
-public sealed record Dot : LexerToken;
-
-public sealed record Plus : LexerToken;
-public sealed record Minus : LexerToken;
-public sealed record Star : LexerToken;
-public sealed record Slash : LexerToken;
-public sealed record Percent : LexerToken;
-public sealed record SemiColon : LexerToken;
-public sealed record Colon : LexerToken;
-public sealed record DoubleColon : LexerToken;
-public sealed record Ampersand : LexerToken;
-public sealed record Pipe : LexerToken;
-
-public sealed record Bang : LexerToken;
-public sealed record Equal : LexerToken;
-public sealed record DoubleEqual : LexerToken;
-public sealed record NotEqual : LexerToken;

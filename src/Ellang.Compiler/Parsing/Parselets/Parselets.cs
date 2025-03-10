@@ -1,7 +1,7 @@
 using Ellang.Compiler.Infra;
-using Ellang.Compiler.Parser.Nodes;
+using Ellang.Compiler.Parsing.Nodes;
 
-namespace Ellang.Compiler.Parser.Parselets;
+namespace Ellang.Compiler.Parsing.Parselets;
 
 public interface IPrefixParselet
 {

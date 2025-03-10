@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace Ellang.Compiler.Semantic;
 
 public interface IOperation
@@ -5,9 +7,14 @@ public interface IOperation
 	TypeReferenceSymbol Type { get; }
 }
 
-public sealed record VariableDeclarationOperation(GlobalVariableSymbol Variable, IOperation? Initializer) : IOperation
+public sealed record VariableDeclarationOperation(IVariableSymbol Variable, IOperation? Initializer) : IOperation
 {
-	public TypeReferenceSymbol Type => Variable.Type;
+	public TypeReferenceSymbol Type => Variable switch
+	{
+		GlobalVariableSymbol g => g.Type,
+		LocalVariableSymbol l => l.Type,
+		var v => throw new UnreachableException($"IVariableSymbol {v?.GetType()} not implemented")
+	};
 }
 
 public sealed record InvocationOperation(IFunctionSymbol Target, List<IOperation> Arguments) : IOperation
@@ -103,7 +110,7 @@ public sealed record GlobalVariableReferenceOperation(GlobalVariableSymbol Symbo
 	public TypeReferenceSymbol Type => Symbol.Type;
 }
 
-public sealed record FunctionReferenceOperation(NamedFunctionSymbol Symbol) : IOperation
+public sealed record FunctionReferenceOperation(GlobalFunctionSymbol Symbol) : IOperation
 {
 	public TypeReferenceSymbol Type => throw new NotImplementedException();
 }

@@ -14,10 +14,6 @@ public sealed class LogValuesFormatter
 	private const string NullValue = "(null)";
 	private readonly CompositeFormat _format;
 
-	// NOTE: If this assembly ever builds for netcoreapp, the below code should change to:
-	// - Be annotated as [SkipLocalsInit] to avoid zero'ing the stackalloc'd char span
-	// - Format _valueNames.Count directly into a span
-
 	public LogValuesFormatter(string format)
 	{
 		ArgumentNullException.ThrowIfNull(format);
@@ -155,19 +151,19 @@ public sealed class LogValuesFormatter
 
 	public string Format() => _format.Format;
 
-	public string Format<TArg0>(TArg0 arg0) => 
-		!TryFormatArgumentIfNullOrEnumerable(arg0, out var arg0String) 
-			? string.Format(CultureInfo.InvariantCulture, _format, arg0) 
+	public string Format<TArg0>(TArg0 arg0) =>
+		!TryFormatArgumentIfNullOrEnumerable(arg0, out var arg0String)
+			? string.Format(CultureInfo.InvariantCulture, _format, arg0)
 			: string.Format(CultureInfo.InvariantCulture, _format, arg0String);
 
-	public string Format<TArg0, TArg1>(TArg0 arg0, TArg1 arg1) => 
+	public string Format<TArg0, TArg1>(TArg0 arg0, TArg1 arg1) =>
 		TryFormatArgumentIfNullOrEnumerable(arg0, out var arg0String) | TryFormatArgumentIfNullOrEnumerable(arg1, out var arg1String)
 			? string.Format(CultureInfo.InvariantCulture, _format, arg0String ?? arg0, arg1String ?? arg1)
 			: string.Format(CultureInfo.InvariantCulture, _format, arg0, arg1);
 
-	public string Format<TArg0, TArg1, TArg2>(TArg0 arg0, TArg1 arg1, TArg2 arg2) => 
-		TryFormatArgumentIfNullOrEnumerable(arg0, out var arg0String) | TryFormatArgumentIfNullOrEnumerable(arg1, out var arg1String) | TryFormatArgumentIfNullOrEnumerable(arg2, out var arg2String) 
-		? string.Format(CultureInfo.InvariantCulture, _format, arg0String ?? arg0, arg1String ?? arg1, arg2String ?? arg2) 
+	public string Format<TArg0, TArg1, TArg2>(TArg0 arg0, TArg1 arg1, TArg2 arg2) =>
+		TryFormatArgumentIfNullOrEnumerable(arg0, out var arg0String) | TryFormatArgumentIfNullOrEnumerable(arg1, out var arg1String) | TryFormatArgumentIfNullOrEnumerable(arg2, out var arg2String)
+		? string.Format(CultureInfo.InvariantCulture, _format, arg0String ?? arg0, arg1String ?? arg1, arg2String ?? arg2)
 		: string.Format(CultureInfo.InvariantCulture, _format, arg0, arg1, arg2);
 
 	public KeyValuePair<string, object?> GetValue(object?[] values, int index)

@@ -1,4 +1,4 @@
-using Ellang.Compiler.Parser.Nodes;
+using Ellang.Compiler.Parsing.Nodes;
 
 namespace Ellang.Compiler.Infra;
 

@@ -1,7 +1,7 @@
-using Ellang.Compiler.Lexer;
-using Ellang.Compiler.Parser.Nodes;
+using Ellang.Compiler.Lexing;
+using Ellang.Compiler.Parsing.Nodes;
 
-namespace Ellang.Compiler.Parser.Parselets;
+namespace Ellang.Compiler.Parsing.Parselets;
 
 // EVERYTHING IS LEFT ASSOCIATIVE
 // this class is used for all binary operators as listed in the switch

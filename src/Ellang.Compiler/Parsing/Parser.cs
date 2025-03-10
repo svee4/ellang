@@ -1,13 +1,13 @@
 using Ellang.Compiler.Infra;
-using Ellang.Compiler.Lexer;
-using Ellang.Compiler.Parser.Nodes;
-using Ellang.Compiler.Parser.Parselets;
+using Ellang.Compiler.Lexing;
+using Ellang.Compiler.Parsing.Nodes;
+using Ellang.Compiler.Parsing.Parselets;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 
-namespace Ellang.Compiler.Parser;
+namespace Ellang.Compiler.Parsing;
 
 /*
  * Primary parser is a recursive descent parser.
@@ -28,9 +28,11 @@ public sealed class Parser
 
 	internal ExpressionParser ExpressionParser { get; }
 	internal ILogger<Parser> Logger { get; }
+	internal Compilation Compilation { get; }
 
-	public Parser(ILogger<Parser> logger)
+	public Parser(Compilation compilation, ILogger<Parser> logger)
 	{
+		Compilation = compilation;
 		Logger = logger;
 		ExpressionParser = new ExpressionParser(this);
 	}
@@ -58,6 +60,14 @@ public sealed class Parser
 	public T Eat<T>() where T : LexerToken =>
 		Peek() is T ? (T)Eat() : ThrowAt<T>(Peek(), "Expected {Expected}, got {Actual}", typeof(T), Eat().GetType());
 
+	public LexerToken Eat<T1, T2>() where T1 : LexerToken where T2 : LexerToken => 
+		Eat() switch
+		{
+			T1 v => v,
+			T2 v => v,
+			var v => ThrowAt<LexerToken>(v, "Expected {Expected1} or {Expected2}, got {Actual}", typeof(T1), typeof(T2), v.GetType())
+		};
+
 	public T? EatIf<T>() where T : LexerToken =>
 		Peek() is T ? Eat<T>() : null;
 
@@ -69,8 +79,9 @@ public sealed class Parser
 		using var scope = Scope();
 		return Peek() switch
 		{
-			FuncKeyword => ParseFunction(),
-			StructKeyword => ParseStruct(),
+			FuncKeyword => ParseFunctionDeclaration(),
+			StructKeyword => ParseStructDeclaration(),
+			ImplKeyword => ParseImplBlock(),
 			var token => ThrowAt<ITopLevelStatement>(token, "Expected func or struct, got {Actual}", token.GetType())
 		};
 	}
@@ -89,12 +100,61 @@ public sealed class Parser
 		}
 	}
 
-	public FunctionDeclarationStatement ParseFunction()
+	private ImplBlockStatement ParseImplBlock()
 	{
 		using var scope = Scope();
 
+		_ = Eat<ImplKeyword>();
+
+		var typeParams = Peek() is OpenAngleBracket
+			? ParseTypeParameters()
+			: [];
+
+		var forStruct = Eat<IdentifierLiteral>().Value;
+		var structGenerics = Peek() is OpenAngleBracket
+			? ParseTypeArguments()
+			: [];
+
+	}
+
+	private EquatableArray<TypeParameter> ParseTypeParameters()
+	{
+		using var scope = Scope();
+
+		List<TypeParameter> typeParameters = [];
+
+		_ = Eat<OpenAngleBracket>();
+
+		while (Peek() is not CloseAngleBracket)
+		{
+			var tpName = Eat<IdentifierLiteral>().Value;
+			// TODO: type parameter constraints
+			typeParameters.Add(new TypeParameter(new Identifier(tpName, null), []));
+		}
+
+		_ = Eat<CloseAngleBracket>();
+		return typeParameters;
+	}
+
+	private sealed record FunctionComponents(
+		Identifier? Name,
+		TypeRef ReturnType,
+		EquatableArray<TypeParameter> TypeParameters,
+		EquatableArray<FunctionParameter> Parameters,
+		EquatableArray<IExpressionStatement> Statements);
+
+	/// <summary>
+	/// Shared logic for function declarations and function expressions
+	/// </summary>
+	private FunctionComponents ParseFunctionComponents(bool named)
+	{
 		_ = Eat<FuncKeyword>();
-		var name = Eat<IdentifierLiteral>();
+
+		var name = named ? new Identifier(Eat<IdentifierLiteral>().Value, Compilation.ModuleName) : null;
+
+		EquatableArray<TypeParameter> typeParams = Peek() is OpenAngleBracket
+			? ParseTypeParameters()
+			: [];
 
 		List<FunctionParameter> parameters = [];
 		using (Scope("[Parameters]"))
@@ -126,10 +186,10 @@ public sealed class Parser
 			_ = Eat<CloseBrace>();
 		}
 
-		return new FunctionDeclarationStatement(
+		return new FunctionComponents(
+			name,
 			returnType,
-			new Identifier(name.Value, null),
-			[],
+			typeParams,
 			parameters,
 			statements);
 
@@ -145,58 +205,52 @@ public sealed class Parser
 		}
 	}
 
+	public FunctionDeclaration ParseFunctionDeclaration()
+	{
+		using var scope = Scope();
+		var components = ParseFunctionComponents(true);
+
+		if (components.Name is null)
+		{
+			throw new UnreachableException("Function name should not be null for function statement");
+		}
+
+		return new FunctionDeclaration(
+			components.ReturnType,
+			components.Name,
+			components.TypeParameters,
+			components.Parameters,
+			components.Statements);
+	}
+
+
+	public FunctionExpression ParseFunctionExpression()
+	{
+		using var scope = Scope();
+		var comps = ParseFunctionComponents(false);
+
+		if (comps.Name is not null)
+		{
+			throw new UnreachableException("Function name should be null for function expression");
+		}
+
+		return new FunctionExpression(
+			comps.ReturnType,
+			comps.TypeParameters,
+			comps.Parameters,
+			comps.Statements);
+	}
+
 	public IExpressionStatement ParseExpressionStatement()
 	{
 		using var scope = Scope();
 
 		var token = Peek();
-		switch (token)
+		return ParseExpression() switch
 		{
-			case VarKeyword:
-			{
-				var expr = ParseVariableDeclaration();
-				_ = Eat<SemiColon>();
-				return expr;
-			}
-			case UnderscoreKeyword:
-			{
-				_ = Eat<UnderscoreKeyword>();
-				_ = Eat<Equal>();
-				var expr = ParseExpression();
-				_ = Eat<SemiColon>();
-				return new DiscardExpression(expr);
-			}
-			case ReturnKeyword:
-			{
-				_ = Eat<ReturnKeyword>();
-				var expr = Peek() switch
-				{
-					SemiColon => null,
-					_ => ParseExpression()
-				};
-				_ = Eat<SemiColon>();
-				return new ReturnExpression(expr);
-			}
-			case YieldKeyword:
-			{
-				_ = Eat<YieldKeyword>();
-				var expr = Peek() switch
-				{
-					SemiColon => null,
-					_ => ParseExpression()
-				};
-				_ = Eat<SemiColon>();
-				return new YieldExpression(expr);
-			}
-			default:
-			{
-				return ParseExpression() switch
-				{
-					IExpressionStatement st => st,
-					var res => ThrowAt<IExpressionStatement>(token, "Expected expression statement, got {Actual}", res)
-				};
-			}
-		}
+			IExpressionStatement st => st,
+			var res => ThrowAt<IExpressionStatement>(token, "Expected expression statement, got {Actual}", res)
+		};
 	}
 
 	public IExpression ParseExpression() =>
@@ -205,12 +259,17 @@ public sealed class Parser
 	public IExpression ParseSubExpression(Precedence precedence) =>
 		ExpressionParser.ParseExpression(precedence);
 
-	public StructDeclarationStatement ParseStruct()
+	public StructDeclaration ParseStructDeclaration()
 	{
 		using var scope = Scope();
 
 		_ = Eat<StructKeyword>();
 		var structName = Eat<IdentifierLiteral>().Value;
+
+		EquatableArray<TypeParameter> typeParams = Peek() is OpenAngleBracket
+			? ParseTypeParameters()
+			: [];
+
 		_ = Eat<OpenBrace>();
 
 		List<StructFieldDeclaration> fields = [];
@@ -227,14 +286,20 @@ public sealed class Parser
 
 		_ = Eat<CloseBrace>();
 
-		return new StructDeclarationStatement(new Identifier(structName, null), [], fields);
+		return new StructDeclaration(new Identifier(structName, null), typeParams, fields);
 	}
 
 	public VariableDeclarationStatement ParseVariableDeclaration()
 	{
 		using var scope = Scope();
 
-		_ = Eat<VarKeyword>();
+		var varType = Eat<LetKeyword, MutKeyword>() switch
+		{
+			LetKeyword => VariableKind.Let,
+			MutKeyword => VariableKind.Mut,
+			_ => throw new UnreachableException()
+		};
+
 		var name = Eat<IdentifierLiteral>().Value;
 
 		_ = Eat<Colon>();
@@ -243,7 +308,7 @@ public sealed class Parser
 		_ = Eat<Equal>();
 		var expr = ParseExpression();
 
-		return new VariableDeclarationStatement(new Identifier(name, null), type, expr);
+		return new VariableDeclarationStatement(new Identifier(name, null), type, varType, expr);
 	}
 
 	public TypeRef ParseTypeRef()
@@ -304,7 +369,7 @@ public sealed class Parser
 	internal T ThrowAt<T>(LexerToken token, string format, params object?[] args) =>
 		Throw<T>(token.Line, token.Column, format, args);
 
-	internal void ThrowAt(LexerToken token, string format, params object?[] args) => 
+	internal void ThrowAt(LexerToken token, string format, params object?[] args) =>
 		Throw<object>(token.Line, token.Column, format, args);
 
 }

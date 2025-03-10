@@ -1,7 +1,7 @@
-using Ellang.Compiler.Lexer;
-using Ellang.Compiler.Parser.Nodes;
+using Ellang.Compiler.Lexing;
+using Ellang.Compiler.Parsing.Nodes;
 
-namespace Ellang.Compiler.Parser.Parselets;
+namespace Ellang.Compiler.Parsing.Parselets;
 
 public sealed class IndexerCallParselet : ParseletBase, IInfixParselet
 {

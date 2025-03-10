@@ -1,13 +1,8 @@
-using Ellang.Compiler.Lexer;
-using Ellang.Compiler.Parser.Nodes;
-using System;
-using System.Collections.Generic;
+using Ellang.Compiler.Lexing;
+using Ellang.Compiler.Parsing.Nodes;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace Ellang.Compiler.Parser.Parselets;
+namespace Ellang.Compiler.Parsing.Parselets;
 
 public sealed class MemberAccessParselet : ParseletBase, IInfixParselet
 {
